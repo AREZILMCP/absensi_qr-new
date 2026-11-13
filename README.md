@@ -32,7 +32,7 @@ Next.js, TypeScript, Tailwind CSS, shadcn/ui, dan Supabase (PostgreSQL).
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
    ```
 
-4. Jalankan migrasi SQL di `supabase/migrations/202611130001_initial_schema.sql` pada project Supabase. Migrasi menyiapkan skema awal; alur transaksi aplikasi dikembangkan bertahap.
+4. Jalankan file SQL di folder `supabase/migrations` secara berurutan pada project Supabase. Migrasi menyiapkan skema, role, dan RPC transaksi check-in, check-out, klaim voucher, penerbitan/pencabutan token QR, serta monitoring Personalia.
 5. Jalankan server development:
 
    ```bash
