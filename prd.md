@@ -16,7 +16,8 @@ Proses fingerprint dan kupon fisik berpotensi menimbulkan antrean, bergantung pa
 
 ## Pengguna dan peran
 - **Admin:** mengelola akun, peran, konfigurasi, dan akses sistem.
-- **HR:** mengelola/memantau data karyawan serta melihat rekap presensi, voucher, dan klaim.
+- **Personalia:** hanya memantau siapa yang lembur dan siapa yang berhak mendapat jatah makan; tidak mengubah presensi atau memproses klaim voucher.
+- **Admin:** mengelola akun, peran, konfigurasi, dan akses sistem.
 - **Petugas presensi/kantin:** memindai QR untuk mencatat presensi atau memproses klaim voucher sesuai tugasnya.
 - **Karyawan:** menunjukkan ID Card QR kepada petugas; bukan pengguna aplikasi native.
 
@@ -26,7 +27,8 @@ Proses fingerprint dan kupon fisik berpotensi menimbulkan antrean, bergantung pa
 - QR Code statis pada ID Card sebagai identitas; QR tidak memuat data pribadi langsung.
 - Petugas yang sudah login melakukan pemindaian check-in, check-out, dan klaim voucher.
 - Penerbitan voucher reguler dan voucher lembur secara otomatis sesuai aturan bisnis.
-- Rekap presensi, voucher reguler/lembur, serta klaim untuk HR.
+- Tampilan monitoring Personalia untuk melihat daftar karyawan yang lembur, daftar karyawan yang berhak mendapat jatah makan, serta jumlah masing-masing untuk tanggal yang dipilih.
+- Rekap presensi, voucher reguler/lembur, serta klaim bagi pengguna yang memiliki izin melihat laporan.
 
 ## Di luar ruang lingkup MVP
 - Penggajian dan perhitungan upah lembur.
@@ -44,6 +46,12 @@ Proses fingerprint dan kupon fisik berpotensi menimbulkan antrean, bergantung pa
 6. Setiap karyawan paling banyak memperoleh satu voucher reguler dan satu voucher lembur per tanggal kerja.
 7. Voucher diklaim di kantin melalui pemindaian QR oleh petugas. Klaim voucher yang sama lebih dari sekali ditolak.
 8. Sistem menolak QR/token tidak valid atau dicabut, karyawan nonaktif, voucher yang sudah diklaim, dan transaksi yang tidak memenuhi aturan waktu.
+
+## Kebutuhan monitoring Personalia
+- Personalia dapat memilih tanggal dan melihat karyawan yang tercatat lembur pada tanggal tersebut.
+- Personalia dapat melihat siapa yang memenuhi syarat jatah makan lembur berdasarkan check-out setelah pukul 18.00.
+- Sistem menampilkan jumlah karyawan lembur dan jumlah karyawan yang berhak atas jatah makan secara terpisah.
+- Personalia memiliki akses baca saja pada monitoring ini; tindakan presensi, penerbitan/klaim voucher, dan perubahan data tidak tersedia untuk peran Personalia.
 
 ## Alur utama
 1. Petugas login dan memilih proses presensi atau klaim kantin.
