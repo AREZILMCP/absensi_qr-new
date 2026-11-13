@@ -1,24 +1,42 @@
-# Absensi QR — Capstone STSI4440
+# Sistem Informasi Absensi dan Kupon Makan
 
-Rebuild MVP berdasarkan laporan *LAPORAN KEMAJUAN CAPSTONE PROJECT STSI4440 KEL 1.pdf*.
+Aplikasi web untuk mendukung presensi dan kupon makan karyawan non-shift PT. Leuwitex Karawang. Fingerprint tetap menjadi sistem utama; aplikasi ini dirancang sebagai jalur alternatif/cadangan. Petugas memindai QR statis pada ID Card karyawan.
 
-## Baseline MVP
+## Fitur
 
-- Karyawan non-shift; jam kerja normal 08.00–16.00 WIB.
-- Check-in QR valid menerbitkan satu voucher reguler.
-- Check-out setelah pukul 18.00 WIB memenuhi syarat satu voucher makan lembur.
-- Petugas kantin memproses klaim voucher satu kali.
-- Personalia hanya memantau siapa yang lembur dan siapa yang berhak mendapat jatah makan.
-- Rancangan stack: Next.js, Supabase/PostgreSQL, Vercel.
+- Check-in dan check-out melalui pemindaian QR oleh petugas; jam kerja normal 08.00–16.00 WIB.
+- Penerbitan satu voucher reguler setelah check-in QR yang valid.
+- Perhitungan lembur setelah pukul 16.00 WIB; satu voucher makan lembur jika check-out setelah pukul 18.00 WIB. Check-out tepat pukul 18.00 atau sebelumnya tidak memenuhi syarat.
+- Penukaran voucher di kantin melalui pemindaian petugas, dengan pencegahan klaim ganda.
+- Monitoring baca-saja untuk Personalia: siapa yang lembur, siapa yang berhak mendapat jatah makan, serta jumlah masing-masing.
 
-Lihat [prd.md](prd.md) untuk kebutuhan produk dan [gap.md](gap.md) untuk perbandingan terhadap aplikasi lama. Folder dan berkas PHP/JavaScript lama masih disimpan selama proses rebuild.
+Penggajian, perhitungan upah lembur, karyawan shift, aplikasi mobile native, integrasi langsung dengan fingerprint, dan QR dinamis tidak termasuk MVP.
 
-## Menjalankan lokal
+## Teknologi
 
-1. Pasang Node.js LTS dan npm.
-2. Jalankan `npm install`.
-3. Salin `.env.example` menjadi `.env.local`, lalu isi URL dan anon key project Supabase.
-4. Jalankan migrasi SQL di `supabase/migrations/202611130001_initial_schema.sql` pada project Supabase.
-5. Jalankan `npm run dev`, kemudian buka `http://localhost:3000`.
+Next.js, TypeScript, Tailwind CSS, shadcn/ui, dan Supabase (PostgreSQL).
 
-Halaman awal saat ini adalah shell dashboard dengan data kosong. Login, pemindaian QR, RPC transaksi, dan koneksi data akan dibangun bertahap setelah konfigurasi Supabase tersedia. Jangan masukkan service-role key ke variabel `NEXT_PUBLIC_*` atau ke kode browser.
+## Development lokal
+
+1. Pasang Node.js dan npm.
+2. Install dependency:
+
+   ```bash
+   npm install
+   ```
+
+3. Salin `.env.example` menjadi `.env.local`, lalu isi kredensial Supabase:
+
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+   ```
+
+4. Jalankan migrasi SQL di `supabase/migrations/202611130001_initial_schema.sql` pada project Supabase. Migrasi menyiapkan skema awal; alur transaksi aplikasi dikembangkan bertahap.
+5. Jalankan server development:
+
+   ```bash
+   npm run dev
+   ```
+
+6. Buka [http://localhost:3000](http://localhost:3000).
