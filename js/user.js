@@ -13,6 +13,24 @@ const User = (() => {
 
     tbody.innerHTML = `<tr><td colspan="6" class="empty-row">Memuat data...</td></tr>`;
 
+    // MODE DEMO: tampilkan akun demo saja, tanpa server.
+    if (typeof Demo !== 'undefined' && Demo.isEnabled()) {
+      cachedUsers = [Object.assign({ is_active: 1 }, Demo.demoUser())];
+      tbody.innerHTML = cachedUsers.map((u, i) => {
+        return `
+          <tr>
+            <td class="cell-no">${i + 1}</td>
+            <td>${escapeHtml(u.username)}</td>
+            <td>${escapeHtml(u.name)}</td>
+            <td><span class="badge badge-info" style="background:#e0e7ff;color:#3730a3;">admin</span></td>
+            <td><span class="badge badge-ok">Aktif</span></td>
+            <td><span class="badge badge-muted">Mode Demo</span></td>
+          </tr>
+        `;
+      }).join('');
+      return;
+    }
+
     try {
       const res = await fetch('api.php?action=get_users');
       const data = await res.json();
@@ -139,6 +157,11 @@ const User = (() => {
   async function save(e) {
     e.preventDefault();
 
+    if (typeof Demo !== 'undefined' && Demo.isEnabled()) {
+      alert('Mode Demo aktif — kelola user tidak tersedia tanpa server.');
+      return;
+    }
+
     const id = document.getElementById('userId').value;
     const username = document.getElementById('userUsername').value.trim();
     const name = document.getElementById('userFullName').value.trim();
@@ -174,6 +197,10 @@ const User = (() => {
   }
 
   async function hapus() {
+    if (typeof Demo !== 'undefined' && Demo.isEnabled()) {
+      alert('Mode Demo aktif — kelola user tidak tersedia tanpa server.');
+      return;
+    }
     if (!editingId) return;
     if (!confirm('Hapus user ini secara permanen?')) return;
 

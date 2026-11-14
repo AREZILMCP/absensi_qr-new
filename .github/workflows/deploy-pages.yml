@@ -1,0 +1,41 @@
+name: Deploy ke GitHub Pages
+
+on:
+  push:
+    branches: [fitur/mode-simulasi-waktu]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      # Pages hanya menyajikan file statis: api.php / config.php /
+      # database.sql tidak ikut di-upload. Mode Demo di aplikasi
+      # jalan tanpa server (localStorage), jadi file-file itu
+      # tidak dibutuhkan di Pages — dan config.php berisi
+      # kredensial database, jangan ikut terbit sebagai file statis.
+      - name: Hapus file server dari artefak Pages
+        run: rm -f api.php config.php database.sql
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      - name: Upload artefak
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

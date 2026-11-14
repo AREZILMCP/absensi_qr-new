@@ -26,6 +26,21 @@ const Auth = (() => {
       return { ok: false, error: 'Username dan password wajib diisi.' };
     }
 
+    // MODE DEMO: login lokal, tanpa api.php / MySQL.
+    if (typeof Demo !== 'undefined' && Demo.isEnabled()) {
+      const demo = Demo.checkLogin(u, p);
+      if (!demo) {
+        return { ok: false, error: 'Mode Demo aktif — pakai username demo / password demo123.' };
+      }
+      currentUser = demo;
+      try {
+        sessionStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
+      } catch (err) {
+        console.warn('Auth: gagal menyimpan sesi', err);
+      }
+      return { ok: true, user: currentUser };
+    }
+
     let res;
     try {
       res = await fetch(`${API_URL}?action=login`, {
@@ -69,7 +84,10 @@ const Auth = (() => {
   }
 
   function logout() {
-    try { fetch(`${API_URL}?action=logout`, { method: 'POST' }).catch(() => {}); } catch { /* ignore */ }
+    // MODE DEMO: tidak ada server untuk di-logout.
+    if (typeof Demo === 'undefined' || !Demo.isEnabled()) {
+      try { fetch(`${API_URL}?action=logout`, { method: 'POST' }).catch(() => {}); } catch { /* ignore */ }
+    }
     currentUser = null;
     try { sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
   }

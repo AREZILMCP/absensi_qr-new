@@ -32,6 +32,21 @@ const Storage = (() => {
 
     initPromise = (async () => {
       try {
+        // MODE DEMO: data dari localStorage, tanpa api.php / MySQL.
+        if (typeof Demo !== 'undefined' && Demo.isEnabled()) {
+          const snap = Demo.ensureSeed();
+          karyawan         = Array.isArray(snap.karyawan)         ? snap.karyawan         : [];
+          riwayat          = Array.isArray(snap.riwayat)          ? snap.riwayat          : [];
+          jenisKartu       = Array.isArray(snap.jenisKartu)       ? snap.jenisKartu       : [];
+          reservasiManual  = Array.isArray(snap.reservasiManual)  ? snap.reservasiManual  : [];
+          reservasiArchive = Array.isArray(snap.reservasiArchive) ? snap.reservasiArchive : [];
+          overtime         = Array.isArray(snap.overtime)         ? snap.overtime         : [];
+          presensi         = Array.isArray(snap.presensi)         ? snap.presensi         : [];
+          lastSynced  = snapshot();
+          initialized = true;
+          return;
+        }
+
         const res = await fetch(API_URL + '?action=bootstrap', { cache: 'no-store' });
         if (!res.ok) throw new Error('Bootstrap HTTP ' + res.status);
         const data = await res.json();
@@ -103,6 +118,22 @@ const Storage = (() => {
   }
 
   // ------------------------------------------------------------
+  // MODE DEMO - simpan snapshot penuh ke localStorage
+  // ------------------------------------------------------------
+  function persistDemo() {
+    if (typeof Demo === 'undefined' || !Demo.isEnabled()) return;
+    Demo.saveSnapshot({
+      karyawan: karyawan,
+      riwayat: riwayat,
+      jenisKartu: jenisKartu,
+      reservasiManual: reservasiManual,
+      reservasiArchive: reservasiArchive,
+      overtime: overtime,
+      presensi: presensi,
+    });
+  }
+
+  // ------------------------------------------------------------
   // SAVE - kirim delta ke server
   // ------------------------------------------------------------
   function save() {
@@ -120,6 +151,15 @@ const Storage = (() => {
     if (Object.keys(delta).length === 0) return;
 
     const sentKeys = Object.keys(delta);
+
+    // MODE DEMO: simpan ke localStorage, tanpa server.
+    if (typeof Demo !== 'undefined' && Demo.isEnabled()) {
+      persistDemo();
+      for (const key of sentKeys) {
+        lastSynced[key] = JSON.stringify(delta[key]);
+      }
+      return;
+    }
 
     syncing = true;
     try {
