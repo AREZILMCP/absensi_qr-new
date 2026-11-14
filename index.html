@@ -8,7 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
-  <link rel="stylesheet" href="css/style.css?v=hero1" />
+  <link rel="stylesheet" href="css/style.css?v=kantin1" />
 </head>
 <body>
 
@@ -190,16 +190,20 @@
               <div class="hero-cam-hint">Kamera belum aktif &mdash; tekan &ldquo;Mulai Scan&rdquo;</div>
             </div>
             <div class="hero-side">
+              <div class="scan-mode">
+                <button type="button" class="scan-mode-btn active" data-scan-mode="presensi">Scan Presensi</button>
+                <button type="button" class="scan-mode-btn" data-scan-mode="kantin">Scan Kantin</button>
+              </div>
               <div class="scan-head">
-                <h4>Scan QR Karyawan</h4>
-                <p>Scan pertama mencatat <strong>absensi</strong>, scan berikutnya mencatat pengambilan <strong>kupon makan</strong>.</p>
+                <h4 id="scanTitle">Scan QR Karyawan</h4>
+                <p id="scanDesc">Scan pertama mencatat <strong>absensi</strong>, scan berikutnya mencatat pengambilan <strong>kupon makan</strong>.</p>
               </div>
               <div class="scan-controls">
                 <button type="button" class="btn btn-success" data-scan-start="qr">Mulai Scan</button>
                 <button type="button" class="btn btn-danger" data-scan-stop>Stop</button>
               </div>
               <div class="result" id="resultScan"></div>
-              <p class="hero-hint">Scan 1 masuk &middot; Scan 2 kupon makan &middot; Scan 3 pulang &middot; Scan 4 kupon lembur</p>
+              <p class="hero-hint" id="heroHint">Scan 1 masuk &middot; Scan 2 kupon makan &middot; Scan 3 pulang &middot; Scan 4 kupon lembur</p>
             </div>
           </div>
 
@@ -232,7 +236,7 @@
                       <li><span class="dot dot-gray"></span>Belum absensi<span class="val" id="legendBelum">0</span></li>
                     </ul>
                   </div>
-                  <div class="grafik-foot"><span class="dot dot-orange"></span>Lembur hari ini: <strong id="lemburHariIni">0</strong> karyawan</div>
+                  <div class="grafik-foot"><span class="dot dot-orange"></span>Lembur hari ini: <strong id="lemburHariIni">0</strong> karyawan<span class="foot-sep">&middot;</span>Kupon terbit: <strong id="kuponTerbit">0</strong></div>
                 </div>
                 <div class="info-card">
                   <div class="info-header"><h4>RIWAYAT SCAN</h4></div>

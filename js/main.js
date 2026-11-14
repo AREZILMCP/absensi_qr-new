@@ -355,6 +355,7 @@
     // Scanner
     document.querySelectorAll('[data-scan-start]').forEach((btn) => btn.addEventListener('click', () => Scanner.start()));
     document.querySelectorAll('[data-scan-stop]').forEach((btn) => btn.addEventListener('click', () => Scanner.stop()));
+    document.querySelectorAll('[data-scan-mode]').forEach((btn) => btn.addEventListener('click', () => Scanner.setMode(btn.dataset.scanMode)));
 
     // Logout
     document.getElementById('btnLogout')?.addEventListener('click', handleLogout);

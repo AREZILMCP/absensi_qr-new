@@ -317,6 +317,8 @@ const Storage = (() => {
       keterangan: 'Siklus harian',
       released: k.kuponReleased !== false,
       releasedAt: k.kuponReleasedAt || k.makanAt,
+      ditebus: k.kuponStatus === 'ditebus' ? 'Ya' : 'Tidak',
+      ditebusAt: k.kuponDitebusAt || '',
       archivedAt: Utils.nowIso(),
     });
 
@@ -325,6 +327,9 @@ const Storage = (() => {
     delete k.kuponKode;
     delete k.kuponReleased;
     delete k.kuponReleasedAt;
+    delete k.kuponStatus;
+    delete k.kuponDitebusAt;
+    delete k.kuponJenis;
     return true;
   }
 
@@ -373,6 +378,8 @@ const Storage = (() => {
           released: !!r.released,
           releasedAt: r.releasedAt || null,
           archivedAt: Utils.nowIso(),
+          ditebus: r.released ? 'Ya' : 'Tidak',
+          ditebusAt: r.releasedAt || null,
         });
       }
 
@@ -450,6 +457,8 @@ const Storage = (() => {
         keterangan: 'Reset otomatis lembur (presensi pulang)',
         released: k.kuponReleased !== false,
         releasedAt: k.kuponReleasedAt || k.makanAt,
+        ditebus: k.kuponStatus === 'ditebus' ? 'Ya' : 'Tidak',
+        ditebusAt: k.kuponDitebusAt || '',
         archivedAt: nowIso,
       });
       k.makan = false;
@@ -457,6 +466,9 @@ const Storage = (() => {
       delete k.kuponKode;
       delete k.kuponReleased;
       delete k.kuponReleasedAt;
+      delete k.kuponStatus;
+      delete k.kuponDitebusAt;
+      delete k.kuponJenis;
     }
 
     // Kupon dari reservasi manual hari ini
@@ -479,6 +491,8 @@ const Storage = (() => {
         released: !!r.released,
         releasedAt: r.releasedAt || null,
         archivedAt: nowIso,
+        ditebus: r.released ? 'Ya' : 'Tidak',
+        ditebusAt: r.releasedAt || null,
       });
     });
     if (manualHariIni.length > 0) {
@@ -518,6 +532,9 @@ const Storage = (() => {
       delete k.kuponKode;
       delete k.kuponReleased;
       delete k.kuponReleasedAt;
+      delete k.kuponStatus;
+      delete k.kuponDitebusAt;
+      delete k.kuponJenis;
     });
     presensi = presensi.filter((r) => String(r.tanggal || '').slice(0, 10) !== today);
     overtime = overtime.filter((r) => String(r.tanggal || '').slice(0, 10) !== today);

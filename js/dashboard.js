@@ -36,10 +36,17 @@ const Dashboard = (() => {
 
     const today = Storage.todayLocalISO();
     const kuponKeys = new Set();
+    let terbit = 0;
 
+    // Kupon scan: hanya yang sudah DITEBUS di kantin yang dihitung
+    // sebagai "Sudah Ambil Makan". Yang masih TERBIT dihitung terpisah.
     list.forEach((k) => {
       if (!Utils.isToday(k.makanAt)) return;
-      kuponKeys.add(k.kuponKode ? 'K:' + k.kuponKode : 'KRY:' + k.id);
+      if (k.kuponStatus === 'ditebus') {
+        kuponKeys.add(k.kuponKode ? 'K:' + k.kuponKode : 'KRY:' + k.id);
+      } else {
+        terbit += 1;
+      }
     });
 
     Storage.getReservasiManual().forEach((r) => {
@@ -52,6 +59,7 @@ const Dashboard = (() => {
     Storage.getReservasiArchive().forEach((r) => {
       if (!r || !r.karyawanId) return;
       if (Utils.toLocalISODate(r.tanggal || r.archivedAt) !== today) return;
+      if (r.ditebus !== 'Ya') return; // arsip kupon yang tidak ditebus bukan ambil makan
       kuponKeys.add(r.kode ? 'K:' + r.kode : 'RA:' + r.id);
     });
 
@@ -69,6 +77,7 @@ const Dashboard = (() => {
     setText('legendTelat', telat);
     setText('legendBelum', belum);
     setText('lemburHariIni', lembur);
+    setText('kuponTerbit', terbit);
     setText('grafikTanggal', today);
 
     renderDonut(tepat, telat, belum, total);

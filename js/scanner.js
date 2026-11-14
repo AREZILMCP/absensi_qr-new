@@ -15,6 +15,38 @@ const Scanner = (() => {
   let lastScan = { text: null, time: 0 };
   let resultTimer = null;
 
+  // Mode scan: 'presensi' (alur 1-4) atau 'kantin' (tebus kupon terbit).
+  // Default presensi; diganti lewat tombol mode di hero dashboard.
+  let mode = 'presensi';
+
+  const MODE_TEXT = {
+    presensi: {
+      title: 'Scan QR Karyawan',
+      desc: 'Scan pertama mencatat <strong>absensi</strong>, scan berikutnya mencatat pengambilan <strong>kupon makan</strong>.',
+      hint: 'Scan 1 masuk · Scan 2 kupon makan · Scan 3 pulang · Scan 4 kupon lembur',
+    },
+    kantin: {
+      title: 'Scan Kantin — Tebus Kupon',
+      desc: 'Scan QR karyawan untuk menebus kupon makan yang sudah <strong>terbit</strong> hari ini. Satu kupon hanya berlaku 1×.',
+      hint: 'Kupon terbit di scan presensi ke-2 (reguler) atau ke-4 (lembur) · tanpa kupon aktif, scan ditolak',
+    },
+  };
+
+  function setMode(m) {
+    if (m !== 'kantin' && m !== 'presensi') return;
+    mode = m;
+    const t = MODE_TEXT[m];
+    const titleEl = document.getElementById('scanTitle');
+    if (titleEl) titleEl.textContent = t.title;
+    const descEl = document.getElementById('scanDesc');
+    if (descEl) descEl.innerHTML = t.desc;
+    const hintEl = document.getElementById('heroHint');
+    if (hintEl) hintEl.textContent = t.hint;
+    document.querySelectorAll('[data-scan-mode]').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.scanMode === m);
+    });
+  }
+
   /* ------------------------------------------------------------
      [2] LIFECYCLE — start / stop kamera
      ------------------------------------------------------------ */
@@ -118,8 +150,12 @@ const Scanner = (() => {
     const manualToday = hasManualToday(karyawan.id);
     const kuponToday = makanToday || manualToday;
 
+    // --- MODE KANTIN: tebus kupon yang sudah terbit (B7) ---
+    if (mode === 'kantin') {
+      handleKantin(karyawan, nowIso, makanToday);
+    }
     // --- STATE 1: belum absen hari ini → catat ABSENSI MASUK ---
-    if (!absenToday) {
+    else if (!absenToday) {
       karyawan.absen = true;
       karyawan.absenAt = nowIso;
       delete karyawan.pulangAt;
@@ -128,21 +164,24 @@ const Scanner = (() => {
       Storage.save();
       showEmployee(karyawan, 'ok', 'Absensi masuk berhasil dicatat');
     }
-    // --- STATE 2: belum punya kupon hari ini → beri KUPON MAKAN ---
+    // --- STATE 2: belum punya kupon hari ini → TERBITKAN KUPON MAKAN ---
     else if (!kuponToday) {
       karyawan.makan = true;
       karyawan.makanAt = nowIso;
       karyawan.kuponKode = Utils.nextKodeTransaksi();
       karyawan.kuponReleased = true;
       karyawan.kuponReleasedAt = nowIso;
+      karyawan.kuponStatus = 'terbit';
+      karyawan.kuponJenis = pulangToday ? 'lembur' : 'reguler';
+      delete karyawan.kuponDitebusAt;
       Storage.addRiwayat(karyawan.nama, 'Kupon Makan');
       Storage.save();
       showEmployee(
         karyawan,
         'ok',
         pulangToday
-          ? 'Kupon Makan lembur (tambahan) berhasil diambil'
-          : 'Kupon Makan berhasil diambil'
+          ? 'Kupon Makan lembur (tambahan) berhasil diterbitkan — tebus di kantin'
+          : 'Kupon Makan berhasil diterbitkan — tebus di kantin'
       );
     }
     // --- STATE 3: sudah absen & punya kupon, belum pulang ---
@@ -152,7 +191,7 @@ const Scanner = (() => {
           karyawan,
           'warn',
           makanToday
-            ? `Sudah absen & sudah ambil kupon makan. Absen pulang mulai ${Utils.formatJamPulang()}`
+            ? `Sudah absen & kupon makan sudah terbit. Absen pulang mulai ${Utils.formatJamPulang()}`
             : 'Kupon makan hari ini sudah tercatat via reservasi manual'
         );
         return;
@@ -178,7 +217,13 @@ const Scanner = (() => {
     }
     // --- STATE 4: sudah absen pulang ---
     else {
-      showEmployee(karyawan, 'warn', 'Sudah absen pulang & kupon makan hari ini sudah diambil');
+      showEmployee(
+        karyawan,
+        'warn',
+        karyawan.kuponStatus === 'ditebus'
+          ? 'Sudah absen pulang & kupon makan hari ini sudah ditebus'
+          : 'Sudah absen pulang — kupon makan masih bisa ditebus di kantin'
+      );
     }
 
     Karyawan.render();
@@ -202,6 +247,40 @@ const Scanner = (() => {
     ) {
       ReleaseReservasi.render();
     }
+  }
+
+  /* ------------------------------------------------------------
+     [4.b] MODE KANTIN — tebus kupon terbit (B7)
+     Kupon dari reservasi manual TIDAK ditebus di sini; jalurnya
+     tetap lewat menu Release Reservasi.
+     ------------------------------------------------------------ */
+  function handleKantin(karyawan, nowIso, makanToday) {
+    if (!makanToday) {
+      showEmployee(
+        karyawan,
+        'warn',
+        'Tidak ada kupon makan aktif hari ini — kupon belum diterbitkan (scan presensi dulu)'
+      );
+      return;
+    }
+    if (karyawan.kuponStatus === 'ditebus') {
+      const d = new Date(karyawan.kuponDitebusAt);
+      const jam = Number.isNaN(d.getTime())
+        ? ''
+        : ` pukul ${d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`;
+      showEmployee(
+        karyawan,
+        'warn',
+        `Kupon makan sudah ditebus${jam} — 1 kupon hanya berlaku 1×`
+      );
+      return;
+    }
+    const jenis = karyawan.kuponJenis === 'lembur' ? 'lembur' : 'reguler';
+    karyawan.kuponStatus = 'ditebus';
+    karyawan.kuponDitebusAt = nowIso;
+    Storage.addRiwayat(karyawan.nama, 'Tebus Kupon');
+    Storage.save();
+    showEmployee(karyawan, 'ok', `Kupon makan ${jenis} berhasil ditebus di kantin`);
   }
 
   /* ------------------------------------------------------------
@@ -271,5 +350,5 @@ const Scanner = (() => {
   /* ------------------------------------------------------------
      [7] EXPORT API
      ------------------------------------------------------------ */
-  return { start, stop, isActive: () => isScanning };
+  return { start, stop, isActive: () => isScanning, setMode, getMode: () => mode };
 })();

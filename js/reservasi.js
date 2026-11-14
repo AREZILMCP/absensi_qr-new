@@ -738,6 +738,8 @@ const ReservasiOvertime = (() => {
         keterangan: 'Diarsipkan untuk lembur',
         released: karyawan.kuponReleased !== false,
         releasedAt: karyawan.kuponReleasedAt || karyawan.makanAt || nowIso,
+        ditebus: karyawan.kuponStatus === 'ditebus' ? 'Ya' : 'Tidak',
+        ditebusAt: karyawan.kuponDitebusAt || '',
         archivedAt: nowIso,
       });
       archived = true;
@@ -747,6 +749,9 @@ const ReservasiOvertime = (() => {
       delete karyawan.kuponKode;
       delete karyawan.kuponReleased;
       delete karyawan.kuponReleasedAt;
+      delete karyawan.kuponStatus;
+      delete karyawan.kuponDitebusAt;
+      delete karyawan.kuponJenis;
     }
 
     if (manualHariIni.length > 0) {
@@ -764,6 +769,8 @@ const ReservasiOvertime = (() => {
           released: !!r.released,
           releasedAt: r.releasedAt || null,
           archivedAt: nowIso,
+          ditebus: r.released ? 'Ya' : 'Tidak',
+          ditebusAt: r.releasedAt || null,
         });
       });
       Storage.setReservasiManual(
