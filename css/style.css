@@ -2262,7 +2262,7 @@ input.input-error:focus {
 .link-btn { background: none; border: none; color: #1e3a8a; font-weight: 600; cursor: pointer; padding: 10px 0 0; font-size: 0.88rem; }
 .link-btn:hover { text-decoration: underline; }
 
-/* ---------- [11.5] Dashboard fit-to-screen (desktop, layar cukup tinggi) ---------- */
+/* ---------- [16] Dashboard fit-to-screen (desktop, layar cukup tinggi) ---------- */
 /* Dashboard mengisi tepat satu layar: kartu scan jadi strip horizontal,
    statistik rapat, dan hanya tabel riwayat yang scroll di dalam kartunya.
    Di bawah 1025px lebar / 700px tinggi, kembali ke layout normal (scroll halaman). */
@@ -2291,7 +2291,7 @@ input.input-error:focus {
   /* Strip simulasi tetap ramping */
   #panel-dashboard .sim-strip { margin-bottom: 12px; flex: none; }
   /* Grid dashboard mengisi sisa layar */
-  #panel-dashboard .dash-grid { flex: 1 1 auto; min-height: 0; }
+  #panel-dashboard .dash-grid { flex: 1 1 auto; min-height: 0; align-items: stretch; }
   #panel-dashboard .dash-col-main { display: flex; flex-direction: column; min-height: 0; }
   #panel-dashboard .block-title { margin-bottom: 8px; flex: none; }
   #panel-dashboard .stats-cards { gap: 12px; margin-bottom: 14px; flex: none; }
