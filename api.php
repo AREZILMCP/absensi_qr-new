@@ -2,6 +2,9 @@
 
 require_once __DIR__ . '/config.php';
 
+// Zona waktu server: WIB — semua validasi jam & timestamp scan memakai ini.
+date_default_timezone_set('Asia/Jakarta');
+
 // Sesi login (dipakai untuk membatasi endpoint khusus Admin)
 ini_set('session.gc_maxlifetime', '43200');
 session_set_cookie_params(['lifetime' => 0, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax']);
@@ -22,6 +25,7 @@ try {
   switch ($action) {
     case 'bootstrap': handleBootstrap($pdo); break;
     case 'sync':      handleSync($pdo);      break;
+    case 'scan':      handleScan($pdo);      break;
     case 'login':     handleLogin($pdo);     break;
     case 'logout':    handleLogout();        break;
     case 'get_users':    handleGetUsers($pdo);    break;
@@ -96,6 +100,12 @@ function requireAdmin(): void {
   }
 }
 
+function requireLogin(): void {
+  if (empty($_SESSION['uid'])) {
+    jsonErr(401, 'Sesi login habis. Silakan login ulang.');
+  }
+}
+
 function handleLogout(): void {
   $_SESSION = [];
   if (session_status() === PHP_SESSION_ACTIVE) session_destroy();
@@ -114,6 +124,19 @@ function ensureSchema(PDO $pdo): void {
   $c = $pdo->query("SHOW COLUMNS FROM karyawan LIKE 'pulang_at'")->fetch();
   if (!$c) {
     $pdo->exec("ALTER TABLE karyawan ADD COLUMN pulang_at VARCHAR(30) NULL AFTER absen_at");
+  }
+  // Kolom status kupon (Fase 1: TERBIT -> DITEBUS) + arsip ditebus (Fase 2)
+  foreach ([
+    ['karyawan', 'kupon_status', 'VARCHAR(20) NULL AFTER kupon_released_at'],
+    ['karyawan', 'kupon_ditebus_at', 'VARCHAR(30) NULL AFTER kupon_status'],
+    ['karyawan', 'kupon_jenis', 'VARCHAR(20) NULL AFTER kupon_ditebus_at'],
+    ['reservasi_archive', 'ditebus', 'VARCHAR(10) NULL AFTER released_at'],
+    ['reservasi_archive', 'ditebus_at', 'VARCHAR(30) NULL AFTER ditebus'],
+  ] as [$table, $col, $def]) {
+    $c = $pdo->query("SHOW COLUMNS FROM $table LIKE '$col'")->fetch();
+    if (!$c) {
+      $pdo->exec("ALTER TABLE $table ADD COLUMN $col $def");
+    }
   }
   // Tabel presensi (riwayat absensi masuk/pulang)
   $pdo->exec("CREATE TABLE IF NOT EXISTS presensi (
@@ -182,8 +205,9 @@ function syncKaryawan(PDO $pdo, array $rows): void {
     (id, nama, kategori, posisi, bagian, status, foto,
      absen, absen_at, pulang_at, makan, makan_at,
      kupon_kode, kupon_released, kupon_released_at,
+     kupon_status, kupon_ditebus_at, kupon_jenis,
      kartu_cetak, kartu_cetak_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)';
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)';
   $stmt = $pdo->prepare($sql);
   foreach ($rows as $r) {
     if (!is_array($r)) continue;
@@ -206,6 +230,9 @@ function syncKaryawan(PDO $pdo, array $rows): void {
       n($r['kuponKode'] ?? null),
       isset($r['kuponReleased']) ? b($r['kuponReleased']) : null,
       n($r['kuponReleasedAt'] ?? null),
+      n($r['kuponStatus'] ?? null),
+      n($r['kuponDitebusAt'] ?? null),
+      n($r['kuponJenis'] ?? null),
       b($r['kartuCetak'] ?? false),
       n($r['kartuCetakAt'] ?? null),
     ]);
@@ -271,8 +298,9 @@ function syncReservasiArchive(PDO $pdo, array $rows): void {
   $pdo->exec('DELETE FROM reservasi_archive');
   $stmt = $pdo->prepare('INSERT INTO reservasi_archive
     (id, kode, karyawan_id, nama, bagian, tanggal, lembur,
-     tindakan, keterangan, released, released_at, archived_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)');
+     tindakan, keterangan, released, released_at, archived_at,
+     ditebus, ditebus_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
   foreach ($rows as $r) {
     if (!is_array($r)) continue;
     $id = reqId($r);
@@ -290,6 +318,8 @@ function syncReservasiArchive(PDO $pdo, array $rows): void {
       b($r['released'] ?? false),
       n($r['releasedAt'] ?? null),
       n($r['archivedAt'] ?? null),
+      n($r['ditebus'] ?? null),
+      n($r['ditebusAt'] ?? null),
     ]);
   }
 }
@@ -461,4 +491,269 @@ function handleDeleteUser(PDO $pdo): void {
   
   $pdo->prepare('DELETE FROM users WHERE id = ?')->execute([$id]);
   jsonOk();
+}
+
+/* ============================================================
+   ACTION: scan — validasi & pencatatan scan dari server (Fase 2)
+   Aturan jam memakai JAM SERVER (WIB), bukan jam perangkat klien.
+   Klien memanggil endpoint ini bila mode server (bukan Mode Demo,
+   bukan simulasi); bila server tidak terjangkau / sesi habis,
+   klien fallback ke logika lokal. Semua tulis dibungkus transaksi.
+   Pesan dikembalikan sama persis dengan pesan logika lokal klien,
+   supaya hasil scan konsisten di kedua jalur.
+   ============================================================ */
+function scanNextKode(PDO $pdo, string $prefix, array $tables): string {
+  $max = 0;
+  foreach ($tables as $t) {
+    [$table, $col] = $t;
+    try {
+      $rows = $pdo->query('SELECT ' . $col . ' FROM ' . $table . ' WHERE ' . $col . ' LIKE ' . $pdo->quote($prefix . '%'))->fetchAll(PDO::FETCH_COLUMN);
+      foreach ($rows as $kode) {
+        $seq = (int)substr((string)$kode, strlen($prefix));
+        if ($seq > $max) $max = $seq;
+      }
+    } catch (Throwable $e) { /* tabel/kolom belum ada — abaikan */ }
+  }
+  return $prefix . str_pad((string)($max + 1), 3, '0', STR_PAD_LEFT);
+}
+
+function scanKaryawan(PDO $pdo, string $id): ?array {
+  $stmt = $pdo->prepare('SELECT * FROM karyawan WHERE id = ? LIMIT 1');
+  $stmt->execute([$id]);
+  $row = $stmt->fetch();
+  return $row ?: null;
+}
+
+function scanIsToday($v, string $today): bool {
+  return $v !== null && $v !== '' && substr((string)$v, 0, 10) === $today;
+}
+
+function scanNewId(): string {
+  return 'RV-ARCH-' . time() . '-' . bin2hex(random_bytes(4));
+}
+
+function scanClearKupon(PDO $pdo, array &$k): void {
+  $pdo->prepare('UPDATE karyawan SET makan = 0, makan_at = NULL, kupon_kode = NULL, kupon_released = NULL, kupon_released_at = NULL, kupon_status = NULL, kupon_ditebus_at = NULL, kupon_jenis = NULL WHERE id = ?')->execute([$k['id']]);
+  $k['makan'] = 0; $k['makan_at'] = null; $k['kupon_kode'] = null;
+  $k['kupon_released'] = null; $k['kupon_released_at'] = null;
+  $k['kupon_status'] = null; $k['kupon_ditebus_at'] = null; $k['kupon_jenis'] = null;
+}
+
+function scanInsertRiwayat(PDO $pdo, string $waktu, string $nama, string $jenis): void {
+  $pdo->prepare('INSERT INTO riwayat (waktu, nama, jenis) VALUES (?,?,?)')->execute([$waktu, $nama, $jenis]);
+}
+
+function scanArchiveKupon(PDO $pdo, array $k, string $keterangan, string $nowIso, string $lembur): void {
+  $pdo->prepare('INSERT INTO reservasi_archive
+    (id, kode, karyawan_id, nama, bagian, tanggal, lembur, tindakan, keterangan, released, released_at, archived_at, ditebus, ditebus_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)')->execute([
+    scanNewId(), $k['kupon_kode'] ?? '', $k['id'], $k['nama'], $k['bagian'] ?? '',
+    $k['makan_at'], $lembur, 'Ambil', $keterangan,
+    ($k['kupon_released'] ?? null) !== null ? (int)(bool)$k['kupon_released'] : 1,
+    $k['kupon_released_at'] ?? $k['makan_at'], $nowIso,
+    ($k['kupon_status'] ?? '') === 'ditebus' ? 'Ya' : 'Tidak',
+    $k['kupon_ditebus_at'] ?? '',
+  ]);
+}
+
+function scanArchiveStaleMeal(PDO $pdo, array &$k, string $today, string $nowIso): bool {
+  if (empty($k['makan']) || empty($k['makan_at'])) return false;
+  if (scanIsToday($k['makan_at'], $today)) return false;
+
+  $hariMakan = substr($k['makan_at'], 0, 10);
+  $stmt = $pdo->prepare("SELECT COUNT(*) FROM reservasi_archive WHERE karyawan_id = ? AND LOWER(keterangan) LIKE '%lembur%' AND SUBSTR(archived_at,1,10) = ?");
+  $stmt->execute([$k['id'], $hariMakan]);
+  $kuponTambahan = ((int)$stmt->fetchColumn()) > 0;
+
+  scanArchiveKupon($pdo, $k, 'Siklus harian', $nowIso, $kuponTambahan ? 'Ya' : 'Tidak');
+  scanClearKupon($pdo, $k);
+  return true;
+}
+
+function scanAutoResetLembur(PDO $pdo, array &$k, string $today, string $nowIso): bool {
+  $stmt = $pdo->prepare('SELECT COUNT(*) FROM overtime WHERE karyawan_id = ? AND SUBSTR(tanggal,1,10) = ?');
+  $stmt->execute([$k['id'], $today]);
+  if ((int)$stmt->fetchColumn() > 0) return false;
+  $stmt = $pdo->prepare("SELECT COUNT(*) FROM reservasi_archive WHERE karyawan_id = ? AND LOWER(keterangan) LIKE '%lembur%' AND SUBSTR(archived_at,1,10) = ?");
+  $stmt->execute([$k['id'], $today]);
+  if ((int)$stmt->fetchColumn() > 0) return false;
+
+  scanArchiveStaleMeal($pdo, $k, $today, $nowIso);
+
+  if (!empty($k['makan']) && scanIsToday($k['makan_at'] ?? null, $today)) {
+    scanArchiveKupon($pdo, $k, 'Reset otomatis lembur (presensi pulang)', $nowIso, 'Tidak');
+    scanClearKupon($pdo, $k);
+  }
+
+  $stmt = $pdo->prepare('SELECT id, kode, tanggal, tindakan, released, released_at, created_at FROM reservasi_manual WHERE karyawan_id = ? AND SUBSTR(COALESCE(tanggal, created_at),1,10) = ?');
+  $stmt->execute([$k['id'], $today]);
+  $manual = $stmt->fetchAll();
+  foreach ($manual as $r) {
+    $pdo->prepare('INSERT INTO reservasi_archive
+      (id, kode, karyawan_id, nama, bagian, tanggal, lembur, tindakan, keterangan, released, released_at, archived_at, ditebus, ditebus_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)')->execute([
+      scanNewId(), $r['kode'] ?? '', $k['id'], $k['nama'], $k['bagian'] ?? '',
+      $r['tanggal'] ?? $nowIso, 'Tidak', $r['tindakan'] ?? 'Ambil', 'Reset otomatis lembur (presensi pulang)',
+      (int)(bool)($r['released'] ?? 0), $r['released_at'] ?? null, $nowIso,
+      !empty($r['released']) ? 'Ya' : 'Tidak', $r['released_at'] ?? null,
+    ]);
+  }
+  if (count($manual) > 0) {
+    $pdo->prepare('DELETE FROM reservasi_manual WHERE karyawan_id = ? AND SUBSTR(COALESCE(tanggal, created_at),1,10) = ?')->execute([$k['id'], $today]);
+  }
+
+  $otId = scanNextKode($pdo, 'OT-' . date('ym') . '-', [['overtime', 'id']]);
+  $pdo->prepare('INSERT INTO overtime (id, karyawan_id, nama, tanggal, status, created_at, released_at, auto_released) VALUES (?,?,?,?,?,?,?,?)')->execute([
+    $otId, $k['id'], $k['nama'], $today, 'aktif', $nowIso, null, 1,
+  ]);
+  return true;
+}
+
+function handleScan(PDO $pdo): void {
+  requireLogin();
+
+  $data = readBody();
+  $kode = trim((string)($data['kode'] ?? ''));
+  $mode = ($data['mode'] ?? 'presensi') === 'kantin' ? 'kantin' : 'presensi';
+
+  if ($kode === '') jsonErr(400, 'Kode karyawan wajib diisi.');
+
+  $now = new DateTime('now');
+  $today = $now->format('Y-m-d');
+  $nowIso = $now->format('Y-m-d\TH:i:s');
+  $waktuServer = $now->format('H:i:s');
+  $waktuRiwayat = $now->format('d/m/Y, H.i.s');
+  $menit = ((int)$now->format('H')) * 60 + ((int)$now->format('i'));
+  $menitPulang = 16 * 60; // 16:00
+  $menitLembur = 18 * 60; // > 18:00 (tepat 18:00 belum lembur)
+
+  $k = scanKaryawan($pdo, $kode);
+  if (!$k) {
+    jsonOk(['result' => [
+      'type' => 'err', 'message' => 'QR tidak dikenali: ' . $kode, 'aksi' => 'err',
+      'karyawan' => null, 'riwayatJenis' => null, 'riwayatTambahan' => null, 'lembur' => false,
+      'nowIso' => $nowIso, 'waktuServer' => $waktuServer,
+    ]]);
+  }
+  if (in_array(strtolower((string)($k['status'] ?? '')), ['non-aktif', 'nonaktif'], true)) {
+    jsonOk(['result' => [
+      'type' => 'err', 'message' => 'Karyawan Non-Aktif — absensi & kupon ditolak', 'aksi' => 'err',
+      'karyawan' => rowsToCamel([$k], 'karyawan')[0], 'riwayatJenis' => null, 'riwayatTambahan' => null, 'lembur' => false,
+      'nowIso' => $nowIso, 'waktuServer' => $waktuServer,
+    ]]);
+  }
+
+  $pdo->beginTransaction();
+  try {
+    // Bersihkan makan kemarin (sama seperti logika lokal klien)
+    scanArchiveStaleMeal($pdo, $k, $today, $nowIso);
+
+    $absenToday = !empty($k['absen']) && scanIsToday($k['absen_at'] ?? null, $today);
+    $makanToday = !empty($k['makan']) && scanIsToday($k['makan_at'] ?? null, $today);
+    $pulangToday = !empty($k['pulang_at']) && scanIsToday($k['pulang_at'], $today);
+    $stmt = $pdo->prepare('SELECT COUNT(*) FROM reservasi_manual WHERE karyawan_id = ? AND SUBSTR(COALESCE(tanggal, created_at),1,10) = ?');
+    $stmt->execute([$k['id'], $today]);
+    $manualToday = ((int)$stmt->fetchColumn()) > 0;
+    $kuponToday = $makanToday || $manualToday;
+
+    $type = 'ok'; $message = ''; $aksi = ''; $riwayatJenis = null; $riwayatTambahan = null; $lembur = false;
+
+    if ($mode === 'kantin') {
+      // Hanya kupon dari scan presensi yang ditebus di sini (B7);
+      // kupon reservasi manual jalurnya tetap Release Reservasi.
+      if (!$makanToday) {
+        $type = 'warn'; $aksi = 'warn';
+        $message = 'Tidak ada kupon makan aktif hari ini — kupon belum diterbitkan (scan presensi dulu)';
+      } elseif (($k['kupon_status'] ?? '') === 'ditebus') {
+        $type = 'warn'; $aksi = 'warn';
+        $jam = substr((string)($k['kupon_ditebus_at'] ?? ''), 11, 5);
+        $message = 'Kupon makan sudah ditebus' . ($jam !== '' ? ' pukul ' . $jam : '') . ' — 1 kupon hanya berlaku 1×';
+      } else {
+        $jenis = ($k['kupon_jenis'] ?? 'reguler') === 'lembur' ? 'lembur' : 'reguler';
+        $pdo->prepare("UPDATE karyawan SET kupon_status = 'ditebus', kupon_ditebus_at = ? WHERE id = ?")->execute([$nowIso, $k['id']]);
+        $k['kupon_status'] = 'ditebus'; $k['kupon_ditebus_at'] = $nowIso;
+        scanInsertRiwayat($pdo, $waktuRiwayat, $k['nama'], 'Tebus Kupon');
+        $type = 'ok'; $aksi = 'tebus'; $riwayatJenis = 'Tebus Kupon';
+        $message = 'Kupon makan ' . $jenis . ' berhasil ditebus di kantin';
+      }
+    } elseif (!$absenToday) {
+      // STATE 1 — masuk
+      $pdo->prepare('UPDATE karyawan SET absen = 1, absen_at = ?, pulang_at = NULL WHERE id = ?')->execute([$nowIso, $k['id']]);
+      $k['absen'] = 1; $k['absen_at'] = $nowIso; $k['pulang_at'] = null;
+      $prId = 'PR-' . str_replace('-', '', $today) . '-' . $k['id'];
+      $pdo->prepare('INSERT INTO presensi (id, karyawan_id, nama, bagian, tanggal, masuk_at, keluar_at, lembur) VALUES (?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE masuk_at = VALUES(masuk_at)')->execute([
+        $prId, $k['id'], $k['nama'], $k['bagian'] ?? '', $today, $nowIso, null, 0,
+      ]);
+      scanInsertRiwayat($pdo, $waktuRiwayat, $k['nama'], 'Absensi');
+      $type = 'ok'; $aksi = 'masuk'; $riwayatJenis = 'Absensi';
+      $message = 'Absensi masuk berhasil dicatat';
+    } elseif (!$kuponToday) {
+      // STATE 2 — kupon terbit
+      $kuponKode = scanNextKode($pdo, 'TR-' . $now->format('ym') . '-', [['reservasi_manual', 'kode'], ['reservasi_archive', 'kode'], ['karyawan', 'kupon_kode']]);
+      $jenis = $pulangToday ? 'lembur' : 'reguler';
+      $pdo->prepare('UPDATE karyawan SET makan = 1, makan_at = ?, kupon_kode = ?, kupon_released = 1, kupon_released_at = ?, kupon_status = ?, kupon_jenis = ?, kupon_ditebus_at = NULL WHERE id = ?')->execute([
+        $nowIso, $kuponKode, $nowIso, 'terbit', $jenis, $k['id'],
+      ]);
+      $k['makan'] = 1; $k['makan_at'] = $nowIso; $k['kupon_kode'] = $kuponKode;
+      $k['kupon_released'] = 1; $k['kupon_released_at'] = $nowIso;
+      $k['kupon_status'] = 'terbit'; $k['kupon_jenis'] = $jenis; $k['kupon_ditebus_at'] = null;
+      scanInsertRiwayat($pdo, $waktuRiwayat, $k['nama'], 'Kupon Makan');
+      $type = 'ok'; $aksi = 'kupon'; $riwayatJenis = 'Kupon Makan';
+      $message = $pulangToday
+        ? 'Kupon Makan lembur (tambahan) berhasil diterbitkan — tebus di kantin'
+        : 'Kupon Makan berhasil diterbitkan — tebus di kantin';
+    } elseif (!$pulangToday) {
+      // STATE 3 — pulang
+      if ($menit < $menitPulang) {
+        $type = 'warn'; $aksi = 'warn';
+        $message = $makanToday
+          ? 'Sudah absen & kupon makan sudah terbit. Absen pulang mulai 16:00'
+          : 'Kupon makan hari ini sudah tercatat via reservasi manual';
+      } else {
+        $lembur = $menit > $menitLembur;
+        $pdo->prepare('UPDATE karyawan SET pulang_at = ? WHERE id = ?')->execute([$nowIso, $k['id']]);
+        $k['pulang_at'] = $nowIso;
+        $prId = 'PR-' . str_replace('-', '', $today) . '-' . $k['id'];
+        $stmt = $pdo->prepare('UPDATE presensi SET keluar_at = ?, lembur = ? WHERE id = ?');
+        $stmt->execute([$nowIso, $lembur ? 1 : 0, $prId]);
+        if ($stmt->rowCount() === 0) {
+          $pdo->prepare('INSERT INTO presensi (id, karyawan_id, nama, bagian, tanggal, masuk_at, keluar_at, lembur) VALUES (?,?,?,?,?,?,?,?)')->execute([
+            $prId, $k['id'], $k['nama'], $k['bagian'] ?? '', $today, $k['absen_at'] ?? $nowIso, $nowIso, $lembur ? 1 : 0,
+          ]);
+        }
+        scanInsertRiwayat($pdo, $waktuRiwayat, $k['nama'], 'Absensi Pulang');
+        $type = 'ok'; $aksi = 'pulang'; $riwayatJenis = 'Absensi Pulang';
+        if ($lembur) {
+          $direset = scanAutoResetLembur($pdo, $k, $today, $nowIso);
+          if ($direset) {
+            scanInsertRiwayat($pdo, $waktuRiwayat, $k['nama'], 'Lembur - Kupon Direset');
+            $riwayatTambahan = 'Lembur - Kupon Direset';
+            $message = 'Absensi pulang dicatat — LEMBUR: kupon makan direset, 1× kupon tambahan tersedia';
+          } else {
+            $message = 'Absensi pulang dicatat (lembur hari ini sudah pernah direset)';
+          }
+        } else {
+          $message = 'Absensi pulang berhasil dicatat';
+        }
+      }
+    } else {
+      // STATE 4 — sudah pulang
+      $type = 'warn'; $aksi = 'warn';
+      $message = ($k['kupon_status'] ?? '') === 'ditebus'
+        ? 'Sudah absen pulang & kupon makan hari ini sudah ditebus'
+        : 'Sudah absen pulang — kupon makan masih bisa ditebus di kantin';
+    }
+
+    $pdo->commit();
+  } catch (Throwable $e) {
+    $pdo->rollBack();
+    throw $e;
+  }
+
+  jsonOk(['result' => [
+    'type' => $type, 'message' => $message, 'aksi' => $aksi,
+    'karyawan' => rowsToCamel([$k], 'karyawan')[0],
+    'riwayatJenis' => $riwayatJenis, 'riwayatTambahan' => $riwayatTambahan, 'lembur' => $lembur,
+    'nowIso' => $nowIso, 'waktuServer' => $waktuServer,
+  ]]);
 }

@@ -35,6 +35,9 @@ CREATE TABLE IF NOT EXISTS karyawan (
   kupon_kode VARCHAR(50) NULL,
   kupon_released TINYINT(1) NULL,
   kupon_released_at VARCHAR(30) NULL,
+  kupon_status VARCHAR(20) NULL,
+  kupon_ditebus_at VARCHAR(30) NULL,
+  kupon_jenis VARCHAR(20) NULL,
   kartu_cetak TINYINT(1) NOT NULL DEFAULT 0,
   kartu_cetak_at VARCHAR(30) NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -78,6 +81,8 @@ CREATE TABLE IF NOT EXISTS reservasi_archive (
   released TINYINT(1) NOT NULL DEFAULT 0,
   released_at VARCHAR(30) NULL,
   archived_at VARCHAR(30) NULL,
+  ditebus VARCHAR(10) NULL,
+  ditebus_at VARCHAR(30) NULL,
   INDEX idx_ra_karyawan (karyawan_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

@@ -113,15 +113,114 @@ const Scanner = (() => {
   }
 
   /* ------------------------------------------------------------
+     [4.a] SCAN VIA SERVER (Fase 2) — validasi jam & state di server
+     Dipakai hanya bila mode server (bukan Mode Demo, bukan simulasi).
+     Bila server tidak terjangkau / sesi habis / respons tidak valid,
+     kembalikan false supaya handleScan jatuh ke logika lokal.
+     ------------------------------------------------------------ */
+  function shouldUseServer() {
+    if (typeof fetch !== 'function') return false;
+    if (typeof Utils !== 'undefined' && Utils.isSimulated && Utils.isSimulated()) return false;
+    if (typeof Demo !== 'undefined' && Demo.isEnabled && Demo.isEnabled()) return false;
+    return true;
+  }
+
+  async function tryServerScan(text) {
+    try {
+      const res = await fetch('api.php?action=scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kode: text, mode }),
+        cache: 'no-store',
+      });
+      if (!res.ok) return false; // 401/404/500 -> fallback lokal
+      const data = await res.json();
+      if (!data || !data.ok || !data.result) return false;
+      applyServerResult(data);
+      return true;
+    } catch {
+      return false; // offline / gagal parse -> fallback lokal
+    }
+  }
+
+  function applyServerResult(data) {
+    const r = data.result;
+    const row = r.karyawan || null;
+    let k = row ? Karyawan.cari(row.id) : null;
+    if (row && k) {
+      // Gabungkan baris server (camelCase) ke objek lokal.
+      Object.assign(k, row);
+    } else if (row) {
+      k = row; // karyawan belum ada di data lokal (mis. baru ditambah di server)
+    }
+    if (k) {
+      if (r.riwayatJenis) {
+        try { Storage.addRiwayat(k.nama, r.riwayatJenis); } catch { /* abaikan */ }
+      }
+      if (r.riwayatTambahan) {
+        try { Storage.addRiwayat(k.nama, r.riwayatTambahan); } catch { /* abaikan */ }
+      }
+      if (r.aksi === 'masuk') {
+        try { Storage.catatPresensiMasuk(k, r.nowIso); } catch { /* abaikan */ }
+      }
+      if (r.aksi === 'pulang') {
+        try { Storage.catatPresensiPulang(k, r.nowIso, !!r.lembur); } catch { /* abaikan */ }
+      }
+      try { Storage.save(); } catch { /* abaikan */ }
+      showEmployee(k, r.type, r.message, r.waktuServer);
+    } else {
+      showSimple(r.message, r.type === 'ok' ? 'ok' : r.type);
+    }
+  }
+
+  function refreshAfterScan() {
+    Karyawan.render();
+    if (typeof Dashboard !== 'undefined') Dashboard.render();
+
+    if (
+      typeof Reservasi !== 'undefined' &&
+      document.getElementById('panel-reservasi')?.classList.contains('active')
+    ) {
+      Reservasi.render();
+    }
+    if (
+      typeof ReservasiOvertime !== 'undefined' &&
+      document.getElementById('panel-reservasi-overtime')?.classList.contains('active')
+    ) {
+      ReservasiOvertime.render();
+    }
+    if (
+      typeof ReleaseReservasi !== 'undefined' &&
+      document.getElementById('panel-release-reservasi')?.classList.contains('active')
+    ) {
+      ReleaseReservasi.render();
+    }
+  }
+
+  /* ------------------------------------------------------------
      [4] HANDLE SCAN — inti logika absensi & kupon
      ------------------------------------------------------------ */
-  function handleScan(text) {
+  async function handleScan(text) {
     if (!isScanning) return;
 
     // Anti-duplikat: cooldown per teks QR
     const now = Date.now(); // jam asli: anti-duplikat 2 detik, bukan jam simulasi
     if (lastScan.text === text && now - lastScan.time < COOLDOWN_MS) return;
     lastScan = { text, time: now };
+
+    // Fase 2: validasi dari server bila mode server (bukan Mode Demo,
+    // bukan simulasi). Bila server tidak terjangkau / sesi habis,
+    // jatuh ke logika lokal di bawah — scan tetap jalan.
+    if (shouldUseServer()) {
+      try {
+        if (await tryServerScan(text)) {
+          refreshAfterScan();
+          return;
+        }
+      } catch (err) {
+        console.warn('Scanner: server scan gagal, fallback lokal', err);
+      }
+    }
 
     const karyawan = Karyawan.cari(text);
     if (!karyawan) {
@@ -226,27 +325,7 @@ const Scanner = (() => {
       );
     }
 
-    Karyawan.render();
-    if (typeof Dashboard !== 'undefined') Dashboard.render();
-
-    if (
-      typeof Reservasi !== 'undefined' &&
-      document.getElementById('panel-reservasi')?.classList.contains('active')
-    ) {
-      Reservasi.render();
-    }
-    if (
-      typeof ReservasiOvertime !== 'undefined' &&
-      document.getElementById('panel-reservasi-overtime')?.classList.contains('active')
-    ) {
-      ReservasiOvertime.render();
-    }
-    if (
-      typeof ReleaseReservasi !== 'undefined' &&
-      document.getElementById('panel-release-reservasi')?.classList.contains('active')
-    ) {
-      ReleaseReservasi.render();
-    }
+    refreshAfterScan();
   }
 
   /* ------------------------------------------------------------
@@ -297,7 +376,7 @@ const Scanner = (() => {
     resultTimer = setTimeout(clearResult, RESULT_TIMEOUT_MS);
   }
 
-  function showEmployee(k, type, message) {
+  function showEmployee(k, type, message, timeStr) {
     const el = document.getElementById(RESULT_ID);
     if (!el) return;
     if (resultTimer) clearTimeout(resultTimer);
@@ -324,7 +403,7 @@ const Scanner = (() => {
             <span class="scan-meta-dot">•</span>
             <span>${escapeHtml(k.kategori || '-')}</span>
           </div>
-          <div class="scan-time">${Utils.now().toLocaleTimeString('id-ID')}</div>
+          <div class="scan-time">${timeStr || Utils.now().toLocaleTimeString('id-ID')}</div>
         </div>
       </div>`;
     el.className = 'result show';
