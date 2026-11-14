@@ -8,7 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
-  <link rel="stylesheet" href="css/style.css?v=50dec11" />
+  <link rel="stylesheet" href="css/style.css?v=hero1" />
 </head>
 <body>
 
@@ -183,18 +183,23 @@
       <main class="content">
         <!-- PANEL DASHBOARD -->
         <section class="panel active" id="panel-dashboard">
-          <div class="mb-16">
-            <div class="scan-card scan-card-single">
+          <!-- HERO: preview kamera jadi fokus utama dashboard -->
+          <div class="hero-scan">
+            <div class="hero-cam">
+              <div id="reader"></div>
+              <div class="hero-cam-hint">Kamera belum aktif &mdash; tekan &ldquo;Mulai Scan&rdquo;</div>
+            </div>
+            <div class="hero-side">
               <div class="scan-head">
                 <h4>Scan QR Karyawan</h4>
                 <p>Scan pertama mencatat <strong>absensi</strong>, scan berikutnya mencatat pengambilan <strong>kupon makan</strong>.</p>
               </div>
-              <div id="reader"></div>
               <div class="scan-controls">
                 <button type="button" class="btn btn-success" data-scan-start="qr">Mulai Scan</button>
                 <button type="button" class="btn btn-danger" data-scan-stop>Stop</button>
               </div>
               <div class="result" id="resultScan"></div>
+              <p class="hero-hint">Scan 1 masuk &middot; Scan 2 kupon makan &middot; Scan 3 pulang &middot; Scan 4 kupon lembur</p>
             </div>
           </div>
 
@@ -207,7 +212,6 @@
 
           <div class="dash-grid">
             <div class="dash-col-main">
-              <h3 class="block-title">Aktivitas Absensi</h3>
               <div class="stats-cards">
                 <div class="stat-card"><div class="stat-num blue" id="statTotal">0</div><div class="stat-lbl">Total Karyawan</div></div>
                 <div class="stat-card"><div class="stat-num red" id="statBelum">0</div><div class="stat-lbl">Belum Absensi</div></div>
@@ -216,20 +220,19 @@
               </div>
               <div class="info-row">
                 <div class="info-card">
-                  <div class="info-header"><h4>DETAIL KARYAWAN</h4></div>
-                  <div class="info-body">
-                    <ul class="info-list">
-                      <li><span class="text-red">Belum Absensi</span><span class="val text-red" id="detailBelum">0</span></li>
-                      <li><span>Sudah Absensi</span><span class="val" id="detailHadir">0</span></li>
-                      <li><span>Sudah Ambil Makan</span><span class="val" id="detailMakan">0</span></li>
-                      <li><span>Total Karyawan</span><span class="val" id="detailTotal">0</span></li>
-                      <li><span class="text-red">Kehadiran Rendah</span><span class="val text-red" id="detailLow">0</span></li>
-                    </ul>
+                  <div class="info-header"><h4>GRAFIK KEHADIRAN</h4><span class="info-date" id="grafikTanggal"></span></div>
+                  <div class="info-body grafik-body">
                     <div class="donut-wrap">
                       <div class="donut" id="donutChart"><div class="donut-hole"><span id="donutPercent">0%</span></div></div>
-                      <div class="donut-label">Kehadiran</div>
+                      <div class="donut-label">Kehadiran hari ini</div>
                     </div>
+                    <ul class="legend">
+                      <li><span class="dot dot-green"></span>Tepat waktu<span class="val" id="legendTepat">0</span></li>
+                      <li><span class="dot dot-amber"></span>Terlambat<span class="val" id="legendTelat">0</span></li>
+                      <li><span class="dot dot-gray"></span>Belum absensi<span class="val" id="legendBelum">0</span></li>
+                    </ul>
                   </div>
+                  <div class="grafik-foot"><span class="dot dot-orange"></span>Lembur hari ini: <strong id="lemburHariIni">0</strong> karyawan</div>
                 </div>
                 <div class="info-card">
                   <div class="info-header"><h4>RIWAYAT SCAN</h4></div>

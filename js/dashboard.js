@@ -19,7 +19,19 @@ const Dashboard = (() => {
 
     const list = Storage.getKaryawan();
     const total = list.length;
-    const hadir = list.filter((k) => Utils.isToday(k.absenAt)).length;
+
+    // Hadir hari ini, dipisah tepat waktu vs terlambat (masuk setelah 08:00).
+    let hadir = 0;
+    let tepat = 0;
+    let telat = 0;
+    list.forEach((k) => {
+      if (!Utils.isToday(k.absenAt)) return;
+      hadir += 1;
+      const d = new Date(k.absenAt);
+      const menit = Number.isNaN(d.getTime()) ? 0 : d.getHours() * 60 + d.getMinutes();
+      if (menit > 8 * 60) telat += 1;
+      else tepat += 1;
+    });
     const belum = total - hadir;
 
     const today = Storage.todayLocalISO();
@@ -45,18 +57,21 @@ const Dashboard = (() => {
 
     const makan = kuponKeys.size;
 
+    // Lembur hari ini dari catatan presensi (pulang setelah 18:00).
+    const lembur = Storage.getPresensi().filter((p) => p.tanggal === today && p.lembur).length;
+
     setText('statTotal', total);
     setText('statHadir', hadir);
     setText('statMakan', makan);
     setText('statBelum', belum);
 
-    setText('detailBelum', belum);
-    setText('detailHadir', hadir);
-    setText('detailMakan', makan);
-    setText('detailTotal', total);
-    setText('detailLow', belum);
+    setText('legendTepat', tepat);
+    setText('legendTelat', telat);
+    setText('legendBelum', belum);
+    setText('lemburHariIni', lembur);
+    setText('grafikTanggal', today);
 
-    renderDonut(hadir, total);
+    renderDonut(tepat, telat, belum, total);
     renderRiwayat();
   }
 
@@ -68,11 +83,16 @@ const Dashboard = (() => {
     if (el) el.textContent = val;
   }
 
-  function renderDonut(hadir, total) {
+  // Donut 3 segmen: tepat waktu (hijau) / terlambat (kuning) / belum (abu).
+  function renderDonut(tepat, telat, belum, total) {
+    const hadir = tepat + telat;
     const percent = total > 0 ? Math.round((hadir / total) * 100) : 0;
+    const tepatPct = total > 0 ? (tepat / total) * 100 : 0;
+    const telatPct = total > 0 ? (telat / total) * 100 : 0;
     const donut = document.getElementById('donutChart');
     if (donut) {
-      donut.style.background = `conic-gradient(#10b981 0% ${percent}%, #e2e8f0 ${percent}% 100%)`;
+      donut.style.background =
+        `conic-gradient(#10b981 0% ${tepatPct}%, #f59e0b ${tepatPct}% ${tepatPct + telatPct}%, #e2e8f0 ${tepatPct + telatPct}% 100%)`;
     }
     setText('donutPercent', `${percent}%`);
   }
@@ -92,7 +112,7 @@ const Dashboard = (() => {
     }
 
     tbody.innerHTML = riwayat
-      .slice(0, 8)
+      .slice(0, 10)
       .map(
         (r) => `
         <tr>
