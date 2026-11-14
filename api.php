@@ -154,6 +154,7 @@ function ensureSchema(PDO $pdo): void {
 }
 
 function handleBootstrap(PDO $pdo): void {
+  requireLogin();
   ensureSchema($pdo);
   $karyawan         = $pdo->query('SELECT * FROM karyawan ORDER BY id ASC')->fetchAll();
   $riwayat          = $pdo->query('SELECT waktu, nama, jenis FROM riwayat ORDER BY id ASC LIMIT 100')->fetchAll();
@@ -180,6 +181,7 @@ function handleBootstrap(PDO $pdo): void {
    ACTION: sync
    ============================================================ */
 function handleSync(PDO $pdo): void {
+  requireLogin();
   $data = readBody();
 
   $pdo->beginTransaction();

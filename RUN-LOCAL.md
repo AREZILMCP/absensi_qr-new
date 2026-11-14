@@ -43,8 +43,8 @@ cp config.local.example.php config.local.php
 
 Isinya sudah benar untuk XAMPP standar (`127.0.0.1`, `root`, password
 kosong, database `absensi_qr`). File `config.local.php` tidak ikut
-commit (ada di `.gitignore`), jadi kredensial hosting di `config.php`
-tetap utuh dan tidak tertimpa.
+commit (ada di `.gitignore`), jadi tidak ada kredensial yang masuk ke
+repo — `config.php` tidak lagi berisi kredensial apa pun.
 
 ## 5. Buka aplikasi
 
