@@ -32,6 +32,12 @@ jobs:
         run: rm -f api.php config.php database.sql
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        with:
+          # Aktifkan Pages otomatis kalau repo ini belum mengaktifkannya.
+          # Tanpa ini, workflow gagal di langkah ini dengan
+          # "Get Pages site failed ... Please verify that the
+          # repository has Pages enabled".
+          enablement: true
       - name: Upload artefak
         uses: actions/upload-pages-artifact@v3
         with:
