@@ -1148,13 +1148,12 @@ input.input-error:focus {
 /* ---------- [9.1] Dash grid ---------- */
 .dash-grid {
   display: grid;
-  grid-template-columns: 1fr 300px;
+  grid-template-columns: 1fr;
   gap: 20px;
   align-items: start;
 }
 
-.dash-col-main,
-.dash-col-side {
+.dash-col-main {
   min-width: 0;
 }
 
@@ -1223,7 +1222,7 @@ input.input-error:focus {
 
 .info-row {
   display: grid;
-  grid-template-columns: 1.2fr 1fr;
+  grid-template-columns: 1fr 1.3fr;
   gap: 16px;
   margin-bottom: 16px;
 }
@@ -1298,39 +1297,6 @@ input.input-error:focus {
 .donut-label {
   font-size: 0.72rem;
   color: #64748b;
-}
-
-/* ---------- [9.5] Summary card ---------- */
-.summary-card {
-  background: #fff;
-  border-radius: 10px;
-  border: 1px solid #e2e8f0;
-  padding: 8px 16px;
-}
-
-.summary-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 0;
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.summary-row:last-child {
-  border-bottom: none;
-}
-
-.summary-lbl {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: #64748b;
-  letter-spacing: 0.5px;
-}
-
-.summary-val {
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: #0f172a;
 }
 
 /* ============================================================
@@ -2319,7 +2285,7 @@ input.input-error:focus {
     column-gap: 20px; align-items: center;
   }
   #panel-dashboard .scan-card-single .scan-head { grid-column: 1 / -1; text-align: left; margin-bottom: 0; }
-  #panel-dashboard #reader { max-width: 200px; margin: 0; }
+  #panel-dashboard #reader { max-width: 200px; min-height: 150px; margin: 0; background: #f8fafc; border: 1px dashed #cbd5e1; }
   #panel-dashboard .scan-controls { margin-top: 0; justify-content: flex-start; }
   #panel-dashboard .result { grid-column: 2; margin-top: 10px; min-height: 0; }
   /* Strip simulasi tetap ramping */
@@ -2327,16 +2293,13 @@ input.input-error:focus {
   /* Grid dashboard mengisi sisa layar */
   #panel-dashboard .dash-grid { flex: 1 1 auto; min-height: 0; }
   #panel-dashboard .dash-col-main { display: flex; flex-direction: column; min-height: 0; }
-  #panel-dashboard .dash-col-side { min-height: 0; }
   #panel-dashboard .block-title { margin-bottom: 8px; flex: none; }
   #panel-dashboard .stats-cards { gap: 12px; margin-bottom: 14px; flex: none; }
   #panel-dashboard .stat-card { padding: 12px 10px; }
   #panel-dashboard .stat-num { font-size: 1.4rem; }
   #panel-dashboard .info-row { flex: 1 1 auto; min-height: 0; margin-bottom: 0; }
   #panel-dashboard .info-card { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  #panel-dashboard .info-card .info-body { flex: 1 1 auto; align-items: center; }
   #panel-dashboard .info-card .table-wrapper { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
   #panel-dashboard .info-card .table-scroll { max-height: none; }
-  /* Ringkasan samping ikut rapat */
-  #panel-dashboard .summary-card { padding: 4px 16px; }
-  #panel-dashboard .summary-row { padding: 10px 0; }
 }

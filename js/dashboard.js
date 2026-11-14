@@ -56,11 +56,6 @@ const Dashboard = (() => {
     setText('detailTotal', total);
     setText('detailLow', belum);
 
-    setText('sumTotal', total);
-    setText('sumHadir', hadir);
-    setText('sumMakan', makan);
-    setText('sumBelum', belum);
-
     renderDonut(hadir, total);
     renderRiwayat();
   }
