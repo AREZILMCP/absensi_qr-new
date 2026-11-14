@@ -16,9 +16,10 @@ concurrency:
 
 jobs:
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    # Tanpa blok environment: environment github-pages di repo ini
+    # menolak branch ini (protection rules). actions/deploy-pages
+    # hanya butuh permissions pages:write + id-token:write, jadi
+    # deploy tetap jalan tanpa environment.
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
