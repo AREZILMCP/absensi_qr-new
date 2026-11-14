@@ -2242,3 +2242,25 @@ input.input-error:focus {
     grid-template-columns: 1fr;
   }
 }
+
+/* Mode Simulasi Waktu (demo / presentasi) */
+.sim-card { background: #fffbeb; border: 2px dashed #f59e0b; border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; }
+.sim-card.sim-active { background: #fef3c7; border-style: solid; }
+.sim-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sim-head h4 { font-size: 0.95rem; }
+.sim-badge { font-size: 0.72rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
+.sim-badge-off { background: #e2e8f0; color: #475569; }
+.sim-badge-on { background: #dc2626; color: #fff; }
+.sim-clock-line { margin-top: 6px; }
+.sim-clock { font-size: 1.25rem; }
+.sim-desc { color: #57534e; margin-top: 4px; }
+.sim-presets { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.sim-custom { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.sim-custom input[type="time"] { padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; }
+.sim-note { color: #57534e; font-size: 0.82rem; margin-top: 10px; }
+
+.sim-calc { margin-top: 12px; border-top: 1px dashed #d97706; padding-top: 10px; }
+.sim-calc h5 { font-size: 0.9rem; margin-bottom: 8px; }
+.sim-calc-result { background: #fff; border: 1px solid #e7e5e4; border-radius: 8px; padding: 10px 12px; margin-top: 8px; }
+.sim-calc-result ul { margin-left: 18px; }
+.sim-calc-result .sim-verdict { font-weight: 700; margin-top: 6px; }

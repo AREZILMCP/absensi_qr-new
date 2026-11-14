@@ -53,14 +53,10 @@ const TransaksiHelper = (() => {
     return `${escapeHtml(mulai || '-')} - ${escapeHtml(selesai || '-')}`;
   }
 
-  function todayISO() {
-    const d = new Date();
-    const off = d.getTimezoneOffset();
-    return new Date(d.getTime() - off * 60000).toISOString().slice(0, 10);
-  }
+  function todayISO() { return Utils.todayLocalISO(); }
 
   function makeId(prefix) {
-    return `${prefix}-${Date.now().toString().slice(-6)}`;
+    return `${prefix}-${Date.now().toString().slice(-6)}`; // ID pakai jam asli
   }
 
   return {
@@ -355,7 +351,7 @@ const Reservasi = (() => {
       keterangan,
       released: false,
       releasedAt: null,
-      createdAt: new Date().toISOString(),
+      createdAt: Utils.nowIso(),
     });
     Storage.save();
 
@@ -389,7 +385,7 @@ const Reservasi = (() => {
 
     if (!r.kode) r.kode = Utils.nextKodeTransaksi();
     r.released = true;
-    r.releasedAt = new Date().toISOString();
+    r.releasedAt = Utils.nowIso();
 
     Storage.save();
     render();
@@ -725,7 +721,7 @@ const ReservasiOvertime = (() => {
     if (!confirm(msg)) return;
 
     let archived = false;
-    const nowIso = new Date().toISOString();
+    const nowIso = Utils.nowIso();
     const newArchId = () =>
       'RV-ARCH-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
 
@@ -782,7 +778,7 @@ const ReservasiOvertime = (() => {
       nama: karyawan.nama,
       tanggal,
       status: 'aktif',
-      createdAt: new Date().toISOString(),
+      createdAt: Utils.nowIso(),
       releasedAt: null,
     });
 
@@ -1065,7 +1061,7 @@ const ReleaseReservasi = (() => {
     const kind = editingRef.slice(0, sep);
     const id = editingRef.slice(sep + 1);
 
-    const now = new Date().toISOString();
+    const now = Utils.nowIso();
 
     if (kind === 'manual') {
       const r = Storage.getReservasiManual().find((x) => x.id === id);

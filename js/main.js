@@ -481,6 +481,7 @@
   async function init() {
     bindLoginForm();
     initSidebarToggle();
+    try { if (typeof Simulator !== 'undefined') Simulator.init(); } catch { /* ignore */ }
 
     if (Auth.isLoggedIn()) {
       try {

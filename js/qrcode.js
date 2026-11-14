@@ -163,7 +163,7 @@ const QRCodeCard = (() => {
       const target = list.find((x) => x.id === k.id);
       if (target) {
         target.kartuCetak = true;
-        target.kartuCetakAt = new Date().toISOString();
+        target.kartuCetakAt = Utils.nowIso();
         Storage.save();
       }
       render();
@@ -178,7 +178,7 @@ const QRCodeCard = (() => {
     }
 
     printCards(list, () => {
-      const now = new Date().toISOString();
+      const now = Utils.nowIso();
       Storage.getKaryawan().forEach((k) => {
         k.kartuCetak = true;
         k.kartuCetakAt = now;

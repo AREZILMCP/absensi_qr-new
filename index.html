@@ -188,6 +188,50 @@
             </div>
           </div>
 
+          <!-- MODE SIMULASI WAKTU (demo / presentasi, bukan operasional) -->
+          <div class="sim-card" id="simCard">
+            <div class="sim-head">
+              <h4>Mode Simulasi Waktu &mdash; untuk demo / presentasi</h4>
+              <span class="sim-badge sim-badge-off" id="simBadge">REALTIME</span>
+            </div>
+            <p class="sim-clock-line">Jam sistem sekarang: <strong class="sim-clock" id="simClock">--:--:--</strong></p>
+            <p class="sim-desc">Klik jam di bawah untuk melompat ke momen itu, lalu scan QR seperti biasa. Jam berjalan normal dari titik itu, jadi 08:05 akan jadi 08:06 semenit kemudian.</p>
+            <div class="sim-presets">
+              <button type="button" class="btn btn-sm btn-secondary" data-sim-time="07:55">07:55 &mdash; sebelum masuk</button>
+              <button type="button" class="btn btn-sm btn-primary" data-sim-time="08:05">08:05 &mdash; absen masuk</button>
+              <button type="button" class="btn btn-sm btn-primary" data-sim-time="12:00">12:00 &mdash; kupon makan</button>
+              <button type="button" class="btn btn-sm btn-secondary" data-sim-time="15:55">15:55 &mdash; coba pulang (ditolak)</button>
+              <button type="button" class="btn btn-sm btn-primary" data-sim-time="16:05">16:05 &mdash; pulang</button>
+              <button type="button" class="btn btn-sm btn-warning" data-sim-time="18:05">18:05 &mdash; pulang lembur</button>
+              <button type="button" class="btn btn-sm btn-warning" data-sim-time="18:10">18:10 &mdash; kupon lembur</button>
+            </div>
+            <div class="sim-custom">
+              <label for="simCustomTime">Jam lain:</label>
+              <input type="time" id="simCustomTime" />
+              <button type="button" class="btn btn-sm btn-primary" id="btnSimSet">Set jam</button>
+              <button type="button" class="btn btn-sm btn-secondary" id="btnSimRealtime">Kembali ke realtime</button>
+              <button type="button" class="btn btn-sm btn-danger" id="btnSimResetDemo">Reset demo hari ini</button>
+            </div>
+            <div class="sim-calc">
+              <h5>Kalkulator Lembur &mdash; cuma ngitung, tidak mengubah data</h5>
+              <div class="sim-custom">
+                <label for="simCalcMasuk">Masuk:</label>
+                <input type="time" id="simCalcMasuk" value="08:05" />
+                <label for="simCalcPulang">Pulang:</label>
+                <input type="time" id="simCalcPulang" value="18:05" />
+                <button type="button" class="btn btn-sm btn-primary" id="btnSimHitung">Hitung</button>
+              </div>
+              <div class="sim-presets">
+                <button type="button" class="btn btn-sm btn-secondary" data-calc-pulang="15:55">Pulang 15:55</button>
+                <button type="button" class="btn btn-sm btn-secondary" data-calc-pulang="16:05">Pulang 16:05</button>
+                <button type="button" class="btn btn-sm btn-secondary" data-calc-pulang="18:00">Pulang 18:00 tepat</button>
+                <button type="button" class="btn btn-sm btn-secondary" data-calc-pulang="18:05">Pulang 18:05</button>
+              </div>
+              <div class="sim-calc-result" id="simCalcHasil"></div>
+            </div>
+            <p class="sim-note">Urutan demo lembur: Reset demo &rarr; 08:05 scan 1 (masuk) &rarr; 12:00 scan 2 (kupon) &rarr; 18:05 scan 3 (pulang + kupon direset) &rarr; 18:10 scan 4 (kupon lembur). Matikan simulasi sebelum dipakai operasional sungguhan.</p>
+          </div>
+
           <div class="dash-grid">
             <div class="dash-col-main">
               <h3 class="block-title">Aktivitas Absensi</h3>
@@ -894,6 +938,7 @@
   <script src="js/qrcode.js"></script>
   <script src="js/scanner.js"></script>
   <script src="js/dashboard.js"></script>
+  <script src="js/simulator.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

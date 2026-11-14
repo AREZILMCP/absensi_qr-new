@@ -157,7 +157,7 @@ const Storage = (() => {
   function getRiwayat() { return riwayat; }
   function addRiwayat(nama, jenis) {
     riwayat.unshift({
-      waktu: new Date().toLocaleString('id-ID'),
+      waktu: Utils.now().toLocaleString('id-ID'),
       nama: nama,
       jenis: jenis,
     });
@@ -277,7 +277,7 @@ const Storage = (() => {
       keterangan: 'Siklus harian',
       released: k.kuponReleased !== false,
       releasedAt: k.kuponReleasedAt || k.makanAt,
-      archivedAt: new Date().toISOString(),
+      archivedAt: Utils.nowIso(),
     });
 
     k.makan = false;
@@ -332,7 +332,7 @@ const Storage = (() => {
           keterangan: r.keterangan || 'Siklus harian',
           released: !!r.released,
           releasedAt: r.releasedAt || null,
-          archivedAt: new Date().toISOString(),
+          archivedAt: Utils.nowIso(),
         });
       }
 
@@ -349,13 +349,7 @@ const Storage = (() => {
   // ------------------------------------------------------------
   // SIKLUS OVERTIME - auto-release
   // ------------------------------------------------------------
-  function todayLocalISO() {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return y + '-' + m + '-' + day;
-  }
+  function todayLocalISO() { return Utils.todayLocalISO(); }
 
   function autoReleaseStaleOvertime() {
     const today = todayLocalISO();
@@ -367,7 +361,7 @@ const Storage = (() => {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(tgl)) return;
       if (tgl < today) {
         r.status = 'release';
-        r.releasedAt = r.releasedAt || new Date().toISOString();
+        r.releasedAt = r.releasedAt || Utils.nowIso();
         r.autoReleased = true;
         changed = true;
       }
@@ -398,7 +392,7 @@ const Storage = (() => {
     // Kupon basi (kemarin) diarsipkan sebagai siklus harian biasa
     archiveStaleMeal(k);
 
-    const nowIso = new Date().toISOString();
+    const nowIso = Utils.nowIso();
     const newId = () =>
       'RV-ARCH-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
 
@@ -466,6 +460,40 @@ const Storage = (() => {
   }
 
   // ------------------------------------------------------------
+  // RESET DEMO HARI INI - untuk presentasi / simulasi.
+  // Hapus SEMUA jejak scan hari ini (waktu simulasi) supaya alur
+  // 1-2-3-4 bisa diulang dari awal: absen/makan/pulang karyawan,
+  // presensi, overtime, reservasi manual & arsip hari ini, riwayat.
+  // Data karyawan, foto, dan data hari lain TIDAK dihapus.
+  // ------------------------------------------------------------
+  function resetDemoHariIni() {
+    const today = todayLocalISO();
+    karyawan.forEach((k) => {
+      if (!Utils.isToday(k.absenAt) && !Utils.isToday(k.makanAt) && !Utils.isToday(k.pulangAt)) return;
+      k.absen = false;
+      delete k.absenAt;
+      delete k.pulangAt;
+      k.makan = false;
+      delete k.makanAt;
+      delete k.kuponKode;
+      delete k.kuponReleased;
+      delete k.kuponReleasedAt;
+    });
+    presensi = presensi.filter((r) => String(r.tanggal || '').slice(0, 10) !== today);
+    overtime = overtime.filter((r) => String(r.tanggal || '').slice(0, 10) !== today);
+    reservasiManual = reservasiManual.filter(
+      (r) => Utils.toLocalISODate(r.tanggal || r.createdAt) !== today
+    );
+    reservasiArchive = reservasiArchive.filter(
+      (r) => Utils.toLocalISODate(r.archivedAt) !== today &&
+             Utils.toLocalISODate(r.tanggal) !== today
+    );
+    riwayat = [];
+    save();
+    return today;
+  }
+
+  // ------------------------------------------------------------
   // RESET
   // ------------------------------------------------------------
   function reset() {
@@ -504,6 +532,7 @@ const Storage = (() => {
     cleanupStaleReservasiManual: cleanupStaleReservasiManual,
     todayLocalISO: todayLocalISO,
     autoReleaseStaleOvertime: autoReleaseStaleOvertime,
-    autoResetLembur: autoResetLembur
+    autoResetLembur: autoResetLembur,
+    resetDemoHariIni: resetDemoHariIni
   };
 })();

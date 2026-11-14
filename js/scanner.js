@@ -69,13 +69,7 @@ const Scanner = (() => {
   /* ------------------------------------------------------------
      [3] HELPER — deteksi tanggal lokal (YYYY-MM-DD, tanpa UTC)
      ------------------------------------------------------------ */
-  function todayLocalISO() {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  }
+  function todayLocalISO() { return Utils.todayLocalISO(); }
 
   function hasManualToday(karyawanId) {
     if (!karyawanId) return false;
@@ -93,7 +87,7 @@ const Scanner = (() => {
     if (!isScanning) return;
 
     // Anti-duplikat: cooldown per teks QR
-    const now = Date.now();
+    const now = Date.now(); // jam asli: anti-duplikat 2 detik, bukan jam simulasi
     if (lastScan.text === text && now - lastScan.time < COOLDOWN_MS) return;
     lastScan = { text, time: now };
 
@@ -117,7 +111,7 @@ const Scanner = (() => {
     const archived = Storage.archiveStaleMeal(karyawan);
     if (archived) Storage.save();
 
-    const nowIso = new Date().toISOString();
+    const nowIso = Utils.nowIso();
     const absenToday = Utils.isToday(karyawan.absenAt);
     const makanToday = Utils.isToday(karyawan.makanAt);
     const pulangToday = Utils.isToday(karyawan.pulangAt);
@@ -251,7 +245,7 @@ const Scanner = (() => {
             <span class="scan-meta-dot">•</span>
             <span>${escapeHtml(k.kategori || '-')}</span>
           </div>
-          <div class="scan-time">${new Date().toLocaleTimeString('id-ID')}</div>
+          <div class="scan-time">${Utils.now().toLocaleTimeString('id-ID')}</div>
         </div>
       </div>`;
     el.className = 'result show';

@@ -24,15 +24,69 @@ const Utils = (() => {
   /* ------------------------------------------------------------
      [3] CEK TANGGAL — apakah value jatuh di HARI INI
      ------------------------------------------------------------ */
+  /* ------------------------------------------------------------
+     [2.b] JAM SISTEM - satu-satunya sumber waktu aplikasi.
+     Normal: jam perangkat (realtime). Mode Simulasi: jam digeser
+     dengan offset (disimpan di localStorage, jadi tahan refresh)
+     supaya demo/presentasi bisa loncat ke 08:05, 12:00, 16:05,
+     18:05, dst tanpa menunggu jam asli. Semua modul WAJIB pakai
+     Utils.now() / nowIso() / nowMs() / isToday(), jangan new Date().
+     ------------------------------------------------------------ */
+  const SIM_KEY = 'absensi_sim_offset_ms';
+
+  function loadSimOffset() {
+    try {
+      const v = parseInt(localStorage.getItem(SIM_KEY) || '0', 10);
+      return Number.isFinite(v) ? v : 0;
+    } catch { return 0; }
+  }
+
+  let simOffsetMs = loadSimOffset();
+
+  function now() { return new Date(Date.now() + simOffsetMs); }
+  function nowMs() { return Date.now() + simOffsetMs; }
+  function nowIso() { return now().toISOString(); }
+  function isSimulated() { return simOffsetMs !== 0; }
+
+  // Set jam simulasi hari ini, mis. '08:05'. Jam berjalan normal
+  // dari titik itu (offset, bukan jam beku), jadi 08:05 akan
+  // menjadi 08:06 semenit kemudian.
+  function setSimulatedTime(hhmm) {
+    const m = String(hhmm || '').trim().match(/^(\d{1,2}):(\d{2})/);
+    if (!m) throw new Error('Format jam tidak valid, pakai HH:MM, contoh 08:05');
+    const h = parseInt(m[1], 10);
+    const min = parseInt(m[2], 10);
+    if (h > 23 || min > 59) throw new Error('Jam tidak valid');
+    const target = new Date();
+    target.setHours(h, min, 0, 0);
+    simOffsetMs = target.getTime() - Date.now();
+    try { localStorage.setItem(SIM_KEY, String(simOffsetMs)); } catch { /* ignore */ }
+    return now();
+  }
+
+  function clearSimulation() {
+    simOffsetMs = 0;
+    try { localStorage.removeItem(SIM_KEY); } catch { /* ignore */ }
+    return now();
+  }
+
+  function todayLocalISO() {
+    const d = now();
+    const y = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${mo}-${day}`;
+  }
+
   function isToday(value) {
     if (!value) return false;
     const d = value instanceof Date ? value : new Date(value);
     if (Number.isNaN(d.getTime())) return false;
-    const now = new Date();
+    const n = now();
     return (
-      d.getFullYear() === now.getFullYear() &&
-      d.getMonth() === now.getMonth() &&
-      d.getDate() === now.getDate()
+      d.getFullYear() === n.getFullYear() &&
+      d.getMonth() === n.getMonth() &&
+      d.getDate() === n.getDate()
     );
   }
 
@@ -56,8 +110,8 @@ const Utils = (() => {
      Atur jam disini untuk otomatis kupon makan lembur
      ------------------------------------------------------------ */
   const WORK = {
-    MASUK: '21:38',              // jam masuk
-    PULANG: '21:38',             // jam pulang
+    MASUK: '08:00',              // jam masuk (non-shift, sesuai artikel B1)
+    PULANG: '16:00',             // jam pulang (non-shift, sesuai artikel B1)
     LEMBUR_SETELAH_MENIT: 120,   // lembur jika pulang >= PULANG
   };
 
@@ -68,7 +122,7 @@ const Utils = (() => {
   }
 
   function detikHariIni(d) {
-    const t = d instanceof Date ? d : new Date();
+    const t = d instanceof Date ? d : now();
     return t.getHours() * 3600 + t.getMinutes() * 60 + t.getSeconds();
   }
 
@@ -77,12 +131,67 @@ const Utils = (() => {
   }
 
   function isLembur(d) {
+    // B4/B5 artikel: lembur hanya bila pulang SETELAH 18:00;
+    // tepat 18:00 atau lebih awal TIDAK memenuhi syarat.
     const batas = jamKeDetik(WORK.PULANG) + WORK.LEMBUR_SETELAH_MENIT * 60;
-    return detikHariIni(d) >= batas;
+    return detikHariIni(d) > batas;
   }
 
   function formatJamPulang() {
     return String(WORK.PULANG).slice(0, 8);
+  }
+
+  /* ------------------------------------------------------------
+     [3.e] KALKULATOR LEMBUR - cuma ngitung, tidak mengubah data.
+     Dipakai panel simulasi untuk menjawab "kalau pulang jam X
+     gimana?" tanpa scan ulang. Aturan dari artikel B3-B5:
+     - pulang >= 16:00 baru boleh pulang
+     - lembur dihitung setelah 16:00
+     - kupon lembur HANYA bila pulang SETELAH 18:00 (tepat 18:00 tidak)
+     ------------------------------------------------------------ */
+  function formatDurasi(menit) {
+    const m = Math.round(menit);
+    if (m < 60) return m + ' menit';
+    const j = Math.floor(m / 60);
+    const s = m % 60;
+    return s === 0 ? j + ' jam' : j + ' jam ' + s + ' menit';
+  }
+
+  function hitungLembur(masukStr, pulangStr) {
+    const masuk = jamKeDetik(masukStr);
+    const pulang = jamKeDetik(pulangStr);
+    if (!Number.isFinite(masuk) || !Number.isFinite(pulang)) {
+      return { error: 'Isi jam masuk dan jam pulang dulu (HH:MM).' };
+    }
+    if (pulang <= masuk) {
+      return { error: 'Jam pulang harus setelah jam masuk (satu hari yang sama).' };
+    }
+    const jamPulang = jamKeDetik(WORK.PULANG);
+    const batasLembur = jamPulang + WORK.LEMBUR_SETELAH_MENIT * 60;
+    const totalMenit = (pulang - masuk) / 60;
+    const lemburMenit = Math.max(0, (pulang - jamPulang) / 60);
+    const bolehPulang = pulang >= jamPulang;
+    const kuponLembur = pulang > batasLembur;
+    const kuponLemburMenit = kuponLembur ? (pulang - batasLembur) / 60 : 0;
+    let alasan;
+    if (!bolehPulang) {
+      alasan = 'Belum boleh pulang: pulang mulai ' + formatJamPulang() + '.';
+    } else if (kuponLembur) {
+      alasan = 'Pulang setelah 18:00, jadi dapat kupon lembur (B4).';
+    } else if (pulang === batasLembur) {
+      alasan = 'Pulang tepat 18:00, belum lembur untuk kupon (B5).';
+    } else {
+      alasan = 'Sudah boleh pulang, tapi belum lewat 18:00, jadi belum dapat kupon lembur.';
+    }
+    return {
+      masuk: String(masukStr).slice(0, 5),
+      pulang: String(pulangStr).slice(0, 5),
+      totalMenit, totalText: formatDurasi(totalMenit),
+      lemburMenit, lemburText: formatDurasi(lemburMenit),
+      bolehPulang, kuponReguler: true,
+      kuponLembur, kuponLemburMenit,
+      alasan,
+    };
   }
 
   /* ------------------------------------------------------------
@@ -149,9 +258,9 @@ const Utils = (() => {
      [5] GENERATE KODE TRANSAKSI — TR-YYMM-XXX (auto-increment)
      ------------------------------------------------------------ */
   function nextKodeTransaksi() {
-    const now = new Date();
-    const yy = String(now.getFullYear()).slice(-2);
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const d = now();
+    const yy = String(d.getFullYear()).slice(-2);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
     const prefix = `TR-${yy}${mm}-`;
 
     let maxSeq = 0;
@@ -200,9 +309,9 @@ const Utils = (() => {
      [5.b] GENERATE KODE OVERTIME — OT-YYMM-XXX (auto-increment)
      ------------------------------------------------------------ */
   function nextKodeOvertime() {
-    const now = new Date();
-    const yy = String(now.getFullYear()).slice(-2);
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const d = now();
+    const yy = String(d.getFullYear()).slice(-2);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
     const prefix = `OT-${yy}${mm}-`;
 
     let maxSeq = 0;
@@ -232,6 +341,13 @@ const Utils = (() => {
   return {
     escapeHtml,
     formatWaktu,
+    now,
+    nowMs,
+    nowIso,
+    isSimulated,
+    setSimulatedTime,
+    clearSimulation,
+    todayLocalISO,
     isToday,
     toLocalISODate,
     sortBy,
@@ -241,6 +357,8 @@ const Utils = (() => {
     isSudahJamPulang,
     isLembur,
     formatJamPulang,
+    hitungLembur,
+    formatDurasi,
     isKaryawanNonAktif,
     nextKodeTransaksi,
     nextKodeOvertime,
