@@ -98,6 +98,21 @@ const Demo = (() => {
     if (info) info.hidden = !on;
     const badge = document.getElementById('demoBadge');
     if (badge) badge.hidden = !on;
+    const modalToggle = document.getElementById('demoModalToggle');
+    if (modalToggle) modalToggle.checked = on;
+    const status = document.getElementById('demoModalStatus');
+    if (status) {
+      status.textContent = on
+        ? 'AKTIF — login pakai demo / demo123, data tersimpan di browser ini saja (localStorage), tidak masuk database.'
+        : 'NONAKTIF — login & data lewat server (api.php + MySQL).';
+    }
+  }
+
+  function turnOnAndReload() {
+    if (typeof Auth !== 'undefined') Auth.logout();
+    if (typeof Storage !== 'undefined') Storage.invalidate();
+    setEnabled(true);
+    location.reload();
   }
 
   function turnOffAndReload() {
@@ -135,6 +150,39 @@ const Demo = (() => {
       });
     }
 
+    // Toggle Mode Demo di dalam modal Pengaturan Demo.
+    const modalToggle = document.getElementById('demoModalToggle');
+    if (modalToggle) {
+      modalToggle.addEventListener('change', async () => {
+        const on = modalToggle.checked;
+        if (on) {
+          if (typeof Auth !== 'undefined' && Auth.isLoggedIn()) {
+            if (!(await Utils.confirmDialog('Aktifkan Mode Demo? Sesi sekarang ditutup dan kamu kembali ke layar login untuk masuk sebagai demo / demo123.'))) {
+              modalToggle.checked = false;
+              syncUI();
+              return;
+            }
+            turnOnAndReload();
+            return;
+          }
+          setEnabled(true);
+          syncUI();
+          return;
+        }
+        if (typeof Auth !== 'undefined' && Auth.isLoggedIn()) {
+          if (!(await Utils.confirmDialog('Matikan Mode Demo? Sesi demo ditutup dan kamu kembali ke login server.'))) {
+            modalToggle.checked = true;
+            syncUI();
+            return;
+          }
+          turnOffAndReload();
+          return;
+        }
+        setEnabled(false);
+        syncUI();
+      });
+    }
+
     syncUI();
   }
 
@@ -153,5 +201,7 @@ const Demo = (() => {
     ensureSeed,
     clearData,
     syncUI,
+    turnOnAndReload,
+    turnOffAndReload,
   };
 })();

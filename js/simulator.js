@@ -41,6 +41,17 @@ const Simulator = (() => {
       badgeEl.className = 'sim-badge ' + (aktif ? 'sim-badge-on' : 'sim-badge-off');
     }
     if (cardEl) cardEl.classList.toggle('sim-active', aktif);
+    // Strip ramping di dashboard: hanya tampil saat simulasi aktif.
+    const stripEl = document.getElementById('simStrip');
+    if (stripEl) stripEl.hidden = !aktif;
+    const stripClockEl = document.getElementById('simStripClock');
+    if (stripClockEl) stripClockEl.textContent = jam + ' • ' + tgl;
+    // Titik merah di FAB saat simulasi atau Mode Demo aktif.
+    const fabDot = document.getElementById('fabDot');
+    if (fabDot) {
+      const demoOn = typeof Demo !== 'undefined' && Demo.isEnabled();
+      fabDot.hidden = !(aktif || demoOn);
+    }
     const customEl = document.getElementById('simCustomTime');
     if (customEl && !customEl.value && aktif) {
       customEl.value = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
@@ -98,6 +109,24 @@ const Simulator = (() => {
       '<div class="sim-verdict">' + Utils.escapeHtml(r.alasan) + '</div>';
   }
 
+  function openSettings() {
+    const m = document.getElementById('modalDemo');
+    if (!m) return;
+    m.hidden = false;
+    document.body.classList.add('modal-open');
+    render();
+  }
+
+  function closeSettings() {
+    const m = document.getElementById('modalDemo');
+    if (!m) return;
+    m.hidden = true;
+    const anyOpen = typeof document.querySelector === 'function'
+      ? document.querySelector('.modal-overlay:not([hidden])')
+      : null;
+    if (!anyOpen) document.body.classList.remove('modal-open');
+  }
+
   function init() {
     if (bound) { render(); return; }
     bound = true;
@@ -121,10 +150,22 @@ const Simulator = (() => {
         hitung();
       });
     });
+    document.getElementById('btnDemoFab')?.addEventListener('click', openSettings);
+    document.getElementById('btnCloseModalDemo')?.addEventListener('click', closeSettings);
+    document.getElementById('btnTutupModalDemo')?.addEventListener('click', closeSettings);
+    document.getElementById('btnSimStripBuka')?.addEventListener('click', openSettings);
+    document.getElementById('modalDemo')?.addEventListener('click', (e) => {
+      if (e.target && e.target.id === 'modalDemo') closeSettings();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      const m = document.getElementById('modalDemo');
+      if (m && !m.hidden) closeSettings();
+    });
     hitung();
     if (!timer) timer = setInterval(render, 1000);
     render();
   }
 
-  return { init, render, setTime, backToRealtime, resetDemo, hitung, PRESETS };
+  return { init, render, setTime, backToRealtime, resetDemo, hitung, PRESETS, openSettings, closeSettings };
 })();

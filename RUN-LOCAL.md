@@ -92,7 +92,7 @@ dipakai, contoh: `python3 -m http.server 8000`.
 ## 7. Checklist verifikasi lokal (sebelum demo)
 
 1. Login admin, buka Dashboard — angka 0 semua di database baru.
-2. Mode Simulasi (panel kuning di Dashboard): 08:05 scan 1 (masuk),
+2. Mode Simulasi (tombol ⚙ Pengaturan Demo di pojok kanan bawah Dashboard): 08:05 scan 1 (masuk),
    12:00 scan 2 (kupon), 15:55 scan 3 (ditolak), 18:05 scan 3
    (pulang lembur), 18:10 scan 4 (kupon lembur). Butuh kamera untuk
    scan QR; di laptop, izinkan akses kamera saat diminta.

@@ -2280,3 +2280,18 @@ input.input-error:focus {
 /* ---------- [11.3] Modal konfirmasi generik ---------- */
 .modal-box-confirm { max-width: 420px; }
 .confirm-msg { white-space: pre-line; color: #334155; line-height: 1.6; margin: 0; }
+
+/* ---------- [11.4] FAB Pengaturan Demo + strip simulasi ramping ---------- */
+.fab-demo { position: fixed; right: 20px; bottom: 20px; width: 56px; height: 56px; border-radius: 50%; border: none; background: #1e3a8a; color: #fff; cursor: pointer; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.35); z-index: 4000; display: flex; align-items: center; justify-content: center; transition: transform 0.15s ease, background 0.15s ease; }
+.fab-demo:hover { background: #172c6b; transform: translateY(-2px); }
+.fab-demo svg { width: 26px; height: 26px; }
+.fab-dot { position: absolute; top: 2px; right: 2px; width: 14px; height: 14px; border-radius: 50%; background: #dc2626; border: 2px solid #fff; }
+.fab-dot[hidden] { display: none; }
+.sim-strip { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 10px; padding: 8px 12px; margin-bottom: 16px; font-size: 0.88rem; }
+.sim-strip[hidden] { display: none; }
+.demo-modal-section { border-bottom: 1px dashed #e2e8f0; padding-bottom: 12px; }
+.demo-modal-section h4 { font-size: 0.95rem; margin-bottom: 6px; }
+.demo-modal-status { color: #57534e; font-size: 0.88rem; margin-bottom: 8px; }
+.demo-modal-hint { color: #57534e; font-size: 0.82rem; margin-top: 8px; }
+.link-btn { background: none; border: none; color: #1e3a8a; font-weight: 600; cursor: pointer; padding: 10px 0 0; font-size: 0.88rem; }
+.link-btn:hover { text-decoration: underline; }

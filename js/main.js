@@ -283,6 +283,8 @@
     });
 
     // Karyawan
+    document.getElementById('btnLihatPresensi')?.addEventListener('click', () => activateTab('presensi'));
+
     document.getElementById('formKaryawan')?.addEventListener('submit', (e) => { e.preventDefault(); Karyawan.tambah(); });
     document.getElementById('formEditKaryawan')?.addEventListener('submit', (e) => { e.preventDefault(); Karyawan.simpanEdit(); });
     document.getElementById('searchKaryawan')?.addEventListener('input', () => Karyawan.render());

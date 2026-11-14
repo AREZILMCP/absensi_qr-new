@@ -97,7 +97,7 @@ const Dashboard = (() => {
     }
 
     tbody.innerHTML = riwayat
-      .slice(0, 30)
+      .slice(0, 8)
       .map(
         (r) => `
         <tr>

@@ -198,48 +198,11 @@
             </div>
           </div>
 
-          <!-- MODE SIMULASI WAKTU (demo / presentasi, bukan operasional) -->
-          <div class="sim-card" id="simCard">
-            <div class="sim-head">
-              <h4>Mode Simulasi Waktu &mdash; untuk demo / presentasi</h4>
-              <span class="sim-badge sim-badge-off" id="simBadge">REALTIME</span>
-            </div>
-            <p class="sim-clock-line">Jam sistem sekarang: <strong class="sim-clock" id="simClock">--:--:--</strong></p>
-            <p class="sim-desc">Klik jam di bawah untuk melompat ke momen itu, lalu scan QR seperti biasa. Jam berjalan normal dari titik itu, jadi 08:05 akan jadi 08:06 semenit kemudian.</p>
-            <div class="sim-presets">
-              <button type="button" class="btn btn-sm btn-secondary" data-sim-time="07:55">07:55 &mdash; sebelum masuk</button>
-              <button type="button" class="btn btn-sm btn-primary" data-sim-time="08:05">08:05 &mdash; absen masuk</button>
-              <button type="button" class="btn btn-sm btn-primary" data-sim-time="12:00">12:00 &mdash; kupon makan</button>
-              <button type="button" class="btn btn-sm btn-secondary" data-sim-time="15:55">15:55 &mdash; coba pulang (ditolak)</button>
-              <button type="button" class="btn btn-sm btn-primary" data-sim-time="16:05">16:05 &mdash; pulang</button>
-              <button type="button" class="btn btn-sm btn-warning" data-sim-time="18:05">18:05 &mdash; pulang lembur</button>
-              <button type="button" class="btn btn-sm btn-warning" data-sim-time="18:10">18:10 &mdash; kupon lembur</button>
-            </div>
-            <div class="sim-custom">
-              <label for="simCustomTime">Jam lain:</label>
-              <input type="time" id="simCustomTime" />
-              <button type="button" class="btn btn-sm btn-primary" id="btnSimSet">Set jam</button>
-              <button type="button" class="btn btn-sm btn-secondary" id="btnSimRealtime">Kembali ke realtime</button>
-              <button type="button" class="btn btn-sm btn-danger" id="btnSimResetDemo">Reset demo hari ini</button>
-            </div>
-            <div class="sim-calc">
-              <h5>Kalkulator Lembur &mdash; cuma ngitung, tidak mengubah data</h5>
-              <div class="sim-custom">
-                <label for="simCalcMasuk">Masuk:</label>
-                <input type="time" id="simCalcMasuk" value="08:05" />
-                <label for="simCalcPulang">Pulang:</label>
-                <input type="time" id="simCalcPulang" value="18:05" />
-                <button type="button" class="btn btn-sm btn-primary" id="btnSimHitung">Hitung</button>
-              </div>
-              <div class="sim-presets">
-                <button type="button" class="btn btn-sm btn-secondary" data-calc-pulang="15:55">Pulang 15:55</button>
-                <button type="button" class="btn btn-sm btn-secondary" data-calc-pulang="16:05">Pulang 16:05</button>
-                <button type="button" class="btn btn-sm btn-secondary" data-calc-pulang="18:00">Pulang 18:00 tepat</button>
-                <button type="button" class="btn btn-sm btn-secondary" data-calc-pulang="18:05">Pulang 18:05</button>
-              </div>
-              <div class="sim-calc-result" id="simCalcHasil"></div>
-            </div>
-            <p class="sim-note">Urutan demo lembur: Reset demo &rarr; 08:05 scan 1 (masuk) &rarr; 12:00 scan 2 (kupon) &rarr; 18:05 scan 3 (pulang + kupon direset) &rarr; 18:10 scan 4 (kupon lembur). Matikan simulasi sebelum dipakai operasional sungguhan.</p>
+          <!-- Strip ramping: simulasi aktif cukup ditandai satu baris; panel lengkap pindah ke modal Pengaturan Demo (FAB) -->
+          <div class="sim-strip" id="simStrip" hidden>
+            <span class="sim-badge sim-badge-on">SIMULASI AKTIF</span>
+            <span>Jam sistem: <strong id="simStripClock">--:--:--</strong></span>
+            <button type="button" class="btn btn-sm btn-secondary" id="btnSimStripBuka">Pengaturan Demo</button>
           </div>
 
           <div class="dash-grid">
@@ -276,6 +239,7 @@
                       <tbody id="riwayat"></tbody>
                     </table>
                   </div>
+                  <button type="button" class="link-btn" id="btnLihatPresensi">Lihat semua presensi &rarr;</button>
                 </div>
               </div>
             </div>
@@ -443,6 +407,11 @@
           </div>
         </section>
 
+      <!-- FAB Pengaturan Demo (pojok kanan bawah) -->
+      <button type="button" class="fab-demo" id="btnDemoFab" title="Pengaturan Demo (Mode Simulasi &amp; Mode Demo)" aria-label="Pengaturan Demo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" /><line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" /><line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" /><line x1="1" y1="14" x2="7" y2="14" /><line x1="9" y1="8" x2="15" y2="8" /><line x1="17" y1="16" x2="23" y2="16" /></svg>
+        <span class="fab-dot" id="fabDot" hidden></span>
+      </button>
       </main>
     </div>
   </div>
@@ -931,6 +900,72 @@
           </div>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Modal Pengaturan Demo (Mode Simulasi + Kalkulator + Mode Demo) -->
+  <div class="modal-overlay" id="modalDemo" hidden>
+    <div class="modal-box modal-box-wide" role="dialog" aria-modal="true" aria-labelledby="modalDemoTitle">
+      <div class="modal-head">
+        <h3 id="modalDemoTitle">Pengaturan Demo</h3>
+        <button type="button" class="modal-close" id="btnCloseModalDemo" aria-label="Tutup">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="demo-modal-section">
+          <h4>Mode Demo</h4>
+          <p class="demo-modal-status" id="demoModalStatus"></p>
+          <label class="demo-switch"><input type="checkbox" id="demoModalToggle" /><span class="demo-slider"></span><span>Mode Demo (tanpa server)</span></label>
+          <p class="demo-modal-hint">Aktif: login pakai demo / demo123, data tersimpan di browser ini saja. Nonaktif: login &amp; data lewat server.</p>
+        </div>
+          <!-- MODE SIMULASI WAKTU (demo / presentasi, bukan operasional) -->
+          <div class="sim-card" id="simCard">
+            <div class="sim-head">
+              <h4>Mode Simulasi Waktu &mdash; untuk demo / presentasi</h4>
+              <span class="sim-badge sim-badge-off" id="simBadge">REALTIME</span>
+            </div>
+            <p class="sim-clock-line">Jam sistem sekarang: <strong class="sim-clock" id="simClock">--:--:--</strong></p>
+            <p class="sim-desc">Klik jam di bawah untuk melompat ke momen itu, lalu scan QR seperti biasa. Jam berjalan normal dari titik itu, jadi 08:05 akan jadi 08:06 semenit kemudian.</p>
+            <div class="sim-presets">
+              <button type="button" class="btn btn-sm btn-secondary" data-sim-time="07:55">07:55 &mdash; sebelum masuk</button>
+              <button type="button" class="btn btn-sm btn-primary" data-sim-time="08:05">08:05 &mdash; absen masuk</button>
+              <button type="button" class="btn btn-sm btn-primary" data-sim-time="12:00">12:00 &mdash; kupon makan</button>
+              <button type="button" class="btn btn-sm btn-secondary" data-sim-time="15:55">15:55 &mdash; coba pulang (ditolak)</button>
+              <button type="button" class="btn btn-sm btn-primary" data-sim-time="16:05">16:05 &mdash; pulang</button>
+              <button type="button" class="btn btn-sm btn-warning" data-sim-time="18:05">18:05 &mdash; pulang lembur</button>
+              <button type="button" class="btn btn-sm btn-warning" data-sim-time="18:10">18:10 &mdash; kupon lembur</button>
+            </div>
+            <div class="sim-custom">
+              <label for="simCustomTime">Jam lain:</label>
+              <input type="time" id="simCustomTime" />
+              <button type="button" class="btn btn-sm btn-primary" id="btnSimSet">Set jam</button>
+              <button type="button" class="btn btn-sm btn-secondary" id="btnSimRealtime">Kembali ke realtime</button>
+              <button type="button" class="btn btn-sm btn-danger" id="btnSimResetDemo">Reset demo hari ini</button>
+            </div>
+            <div class="sim-calc">
+              <h5>Kalkulator Lembur &mdash; cuma ngitung, tidak mengubah data</h5>
+              <div class="sim-custom">
+                <label for="simCalcMasuk">Masuk:</label>
+                <input type="time" id="simCalcMasuk" value="08:05" />
+                <label for="simCalcPulang">Pulang:</label>
+                <input type="time" id="simCalcPulang" value="18:05" />
+                <button type="button" class="btn btn-sm btn-primary" id="btnSimHitung">Hitung</button>
+              </div>
+              <div class="sim-presets">
+                <button type="button" class="btn btn-sm btn-secondary" data-calc-pulang="15:55">Pulang 15:55</button>
+                <button type="button" class="btn btn-sm btn-secondary" data-calc-pulang="16:05">Pulang 16:05</button>
+                <button type="button" class="btn btn-sm btn-secondary" data-calc-pulang="18:00">Pulang 18:00 tepat</button>
+                <button type="button" class="btn btn-sm btn-secondary" data-calc-pulang="18:05">Pulang 18:05</button>
+              </div>
+              <div class="sim-calc-result" id="simCalcHasil"></div>
+            </div>
+            <p class="sim-note">Urutan demo lembur: Reset demo &rarr; 08:05 scan 1 (masuk) &rarr; 12:00 scan 2 (kupon) &rarr; 18:05 scan 3 (pulang + kupon direset) &rarr; 18:10 scan 4 (kupon lembur). Matikan simulasi sebelum dipakai operasional sungguhan.</p>
+          </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-secondary" id="btnTutupModalDemo">Tutup</button>
+      </div>
     </div>
   </div>
 
