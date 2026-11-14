@@ -2295,3 +2295,48 @@ input.input-error:focus {
 .demo-modal-hint { color: #57534e; font-size: 0.82rem; margin-top: 8px; }
 .link-btn { background: none; border: none; color: #1e3a8a; font-weight: 600; cursor: pointer; padding: 10px 0 0; font-size: 0.88rem; }
 .link-btn:hover { text-decoration: underline; }
+
+/* ---------- [11.5] Dashboard fit-to-screen (desktop, layar cukup tinggi) ---------- */
+/* Dashboard mengisi tepat satu layar: kartu scan jadi strip horizontal,
+   statistik rapat, dan hanya tabel riwayat yang scroll di dalam kartunya.
+   Di bawah 1025px lebar / 700px tinggi, kembali ke layout normal (scroll halaman). */
+@media (min-width: 1025px) and (min-height: 700px) {
+  .app { height: 100vh; height: 100dvh; }
+  .main { min-height: 0; }
+  .topbar { flex: none; }
+  .content { display: flex; flex-direction: column; overflow-y: auto; }
+  .content > .panel { flex: none; }
+
+  #panel-dashboard.active {
+    display: flex; flex-direction: column;
+    flex: 1 1 auto; min-height: 0; overflow: hidden;
+  }
+  /* Kartu scan: strip horizontal (kamera kiri, tombol + hasil kanan) */
+  #panel-dashboard .mb-16 { margin-bottom: 14px; flex: none; }
+  #panel-dashboard .scan-card { max-width: none; padding: 14px 18px; }
+  #panel-dashboard .scan-card-single {
+    display: grid; grid-template-columns: 200px 1fr;
+    column-gap: 20px; align-items: center;
+  }
+  #panel-dashboard .scan-card-single .scan-head { grid-column: 1 / -1; text-align: left; margin-bottom: 0; }
+  #panel-dashboard #reader { max-width: 200px; margin: 0; }
+  #panel-dashboard .scan-controls { margin-top: 0; justify-content: flex-start; }
+  #panel-dashboard .result { grid-column: 2; margin-top: 10px; min-height: 0; }
+  /* Strip simulasi tetap ramping */
+  #panel-dashboard .sim-strip { margin-bottom: 12px; flex: none; }
+  /* Grid dashboard mengisi sisa layar */
+  #panel-dashboard .dash-grid { flex: 1 1 auto; min-height: 0; }
+  #panel-dashboard .dash-col-main { display: flex; flex-direction: column; min-height: 0; }
+  #panel-dashboard .dash-col-side { min-height: 0; }
+  #panel-dashboard .block-title { margin-bottom: 8px; flex: none; }
+  #panel-dashboard .stats-cards { gap: 12px; margin-bottom: 14px; flex: none; }
+  #panel-dashboard .stat-card { padding: 12px 10px; }
+  #panel-dashboard .stat-num { font-size: 1.4rem; }
+  #panel-dashboard .info-row { flex: 1 1 auto; min-height: 0; margin-bottom: 0; }
+  #panel-dashboard .info-card { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  #panel-dashboard .info-card .table-wrapper { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+  #panel-dashboard .info-card .table-scroll { max-height: none; }
+  /* Ringkasan samping ikut rapat */
+  #panel-dashboard .summary-card { padding: 4px 16px; }
+  #panel-dashboard .summary-row { padding: 10px 0; }
+}
