@@ -106,10 +106,10 @@ const Presensi = (() => {
   /* ------------------------------------------------------------
      [4] HAPUS
      ------------------------------------------------------------ */
-  function hapus(id) {
+  async function hapus(id) {
     const p = Storage.getPresensi().find((x) => x.id === id);
     if (!p) return;
-    if (!confirm(`Hapus presensi ${p.nama} tanggal ${formatTanggal(p.tanggal)}?`)) return;
+    if (!(await Utils.confirmDialog(`Hapus presensi ${p.nama} tanggal ${formatTanggal(p.tanggal)}?`))) return;
 
     Storage.setPresensi(Storage.getPresensi().filter((x) => x.id !== id));
     Storage.save();

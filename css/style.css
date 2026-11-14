@@ -2276,3 +2276,7 @@ input.input-error:focus {
 .demo-switch input:focus-visible + .demo-slider { outline: 2px solid #1e3a8a; outline-offset: 2px; }
 .demo-info { margin-top: 8px; font-size: 0.85rem; color: #57534e; background: #fffbeb; border: 1px dashed #f59e0b; border-radius: 8px; padding: 8px 10px; }
 .demo-badge { font-size: 0.72rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: none; cursor: pointer; background: #d97706; color: #fff; }
+
+/* ---------- [11.3] Modal konfirmasi generik ---------- */
+.modal-box-confirm { max-width: 420px; }
+.confirm-msg { white-space: pre-line; color: #334155; line-height: 1.6; margin: 0; }

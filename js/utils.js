@@ -335,6 +335,100 @@ const Utils = (() => {
     return `${prefix}${String(maxSeq + 1).padStart(3, '0')}`;
   }
 
+
+  /* ------------------------------------------------------------
+     [5.b] DIALOG — modal konfirmasi & alert aplikasi.
+     Pengganti native confirm()/alert() yang di-suppress sebagian
+     browser (embedded/cloud) sehingga tombol Hapus/Keluar/Release
+     tampak mati. Fallback ke native bila markup modal tidak ada.
+     ------------------------------------------------------------ */
+  let dialogState = null; // { resolve, els }
+  let dialogWired = false;
+
+  function getDialogEls() {
+    if (typeof document === 'undefined') return null;
+    const modal = document.getElementById('modalConfirm');
+    if (!modal) return null;
+    return {
+      modal,
+      title: document.getElementById('modalConfirmTitle'),
+      msg: document.getElementById('modalConfirmMsg'),
+      btnYa: document.getElementById('btnModalConfirmYa'),
+      btnBatal: document.getElementById('btnModalConfirmBatal'),
+      btnClose: document.getElementById('btnCloseModalConfirm'),
+    };
+  }
+
+  function closeDialog(result) {
+    if (!dialogState) return;
+    const { resolve, els } = dialogState;
+    dialogState = null;
+    els.modal.hidden = true;
+    if (document.body && document.body.classList) document.body.classList.remove('modal-open');
+    resolve(result);
+  }
+
+  function wireDialog(els) {
+    if (dialogWired) return;
+    dialogWired = true;
+    els.btnYa.addEventListener('click', () => closeDialog(true));
+    els.btnBatal.addEventListener('click', () => closeDialog(false));
+    els.btnClose.addEventListener('click', () => closeDialog(false));
+    els.modal.addEventListener('click', (e) => {
+      if (e.target === els.modal) closeDialog(false);
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && dialogState) closeDialog(false);
+    });
+  }
+
+  function showDialog({ title, message, okText, showCancel }) {
+    return new Promise((resolve) => {
+      const els = getDialogEls();
+      if (!els) {
+        if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
+          if (showCancel) { resolve(window.confirm(message)); return; }
+          if (typeof window.alert === 'function') window.alert(message);
+          resolve(true); return;
+        }
+        resolve(true);
+        return;
+      }
+      // Dialog sebelumnya (kalau ada) dianggap dibatalkan.
+      if (dialogState) dialogState.resolve(false);
+      wireDialog(els);
+      els.title.textContent = title;
+      els.msg.textContent = message;
+      els.btnYa.textContent = okText;
+      els.btnYa.className = 'btn ' + (showCancel ? 'btn-danger' : 'btn-primary');
+      els.btnBatal.style.display = showCancel ? '' : 'none';
+      dialogState = { resolve, els };
+      els.modal.hidden = false;
+      if (document.body && document.body.classList) document.body.classList.add('modal-open');
+      if (els.btnYa.focus) els.btnYa.focus();
+    });
+  }
+
+  function confirmDialog(message, opts) {
+    const o = opts || {};
+    return showDialog({
+      title: o.title || 'Konfirmasi',
+      message,
+      okText: o.okText || 'Ya, lanjutkan',
+      showCancel: true,
+    });
+  }
+
+  function alertDialog(message, opts) {
+    const o = opts || {};
+    return showDialog({
+      title: o.title || 'Perhatian',
+      message,
+      okText: o.okText || 'OK',
+      showCancel: false,
+    }).then(() => undefined);
+  }
+
   /* ------------------------------------------------------------
      [6] EXPORT — API publik
      ------------------------------------------------------------ */
@@ -362,5 +456,7 @@ const Utils = (() => {
     isKaryawanNonAktif,
     nextKodeTransaksi,
     nextKodeOvertime,
+    confirmDialog,
+    alertDialog,
   };
 })();

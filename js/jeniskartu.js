@@ -224,7 +224,7 @@ const JenisKartu = (() => {
   /* ------------------------------------------------------------
      [5] HAPUS — dengan reassign kategori karyawan terdampak
      ------------------------------------------------------------ */
-  function hapus(id) {
+  async function hapus(id) {
     const targetId = id || editingId;
     if (!targetId) return;
 
@@ -247,7 +247,7 @@ const JenisKartu = (() => {
         `Lanjutkan?`;
     }
 
-    if (!confirm(msg)) return;
+    if (!(await Utils.confirmDialog(msg))) return;
 
     Storage.setJenisKartu(remaining);
 

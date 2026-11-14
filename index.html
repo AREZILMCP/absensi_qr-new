@@ -934,6 +934,25 @@
     </div>
   </div>
 
+  <!-- Modal konfirmasi / alert generik (pengganti native confirm()/alert()) -->
+  <div class="modal-overlay" id="modalConfirm" hidden>
+    <div class="modal-box modal-box-confirm" role="alertdialog" aria-modal="true" aria-labelledby="modalConfirmTitle">
+      <div class="modal-head">
+        <h3 id="modalConfirmTitle">Konfirmasi</h3>
+        <button type="button" class="modal-close" id="btnCloseModalConfirm" aria-label="Tutup">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p id="modalConfirmMsg" class="confirm-msg"></p>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-secondary" id="btnModalConfirmBatal">Batal</button>
+        <button type="button" class="btn btn-danger" id="btnModalConfirmYa">Ya, lanjutkan</button>
+      </div>
+    </div>
+  </div>
+
   <script src="js/utils.js"></script>
   <script src="js/demo.js"></script>
   <script src="js/storage.js"></script>

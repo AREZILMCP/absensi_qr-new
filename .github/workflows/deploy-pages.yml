@@ -29,7 +29,7 @@ jobs:
       # tidak dibutuhkan di Pages — dan config.php berisi
       # kredensial database, jangan ikut terbit sebagai file statis.
       - name: Hapus file server dari artefak Pages
-        run: rm -f api.php config.php database.sql
+        run: rm -f api.php config.php config.local.example.php database.sql
       - name: Setup Pages
         uses: actions/configure-pages@v5
         with:

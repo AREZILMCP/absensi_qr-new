@@ -1,0 +1,5 @@
+# Kredensial database lokal (lihat config.local.example.php)
+config.local.php
+
+# macOS
+.DS_Store

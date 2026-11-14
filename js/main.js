@@ -407,8 +407,8 @@
     }
   }
 
-  function handleLogout() {
-    if (!confirm('Yakin ingin keluar dari aplikasi?')) return;
+  async function handleLogout() {
+    if (!(await Utils.confirmDialog('Yakin ingin keluar dari aplikasi?'))) return;
     Auth.logout();
     Scanner.stop();
     clearSavedTab();

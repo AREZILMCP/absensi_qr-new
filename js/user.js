@@ -202,7 +202,7 @@ const User = (() => {
       return;
     }
     if (!editingId) return;
-    if (!confirm('Hapus user ini secara permanen?')) return;
+    if (!(await Utils.confirmDialog('Hapus user ini secara permanen?'))) return;
 
     try {
       const res = await fetch('api.php?action=delete_user', {

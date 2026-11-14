@@ -372,11 +372,11 @@ const Karyawan = (() => {
     refreshLain();
   }
 
-  function hapus(id) {
+  async function hapus(id) {
     const targetId = id || editingId;
     if (!targetId) return;
 
-    if (!confirm('Hapus karyawan ini? Tindakan tidak dapat dibatalkan.')) return;
+    if (!(await Utils.confirmDialog('Hapus karyawan ini? Tindakan tidak dapat dibatalkan.'))) return;
 
     Storage.setKaryawan(Storage.getKaryawan().filter((k) => k.id !== targetId));
     Storage.save();

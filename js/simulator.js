@@ -51,11 +51,11 @@ const Simulator = (() => {
     try { if (typeof Dashboard !== 'undefined') Dashboard.render(); } catch { /* ignore */ }
   }
 
-  function setTime(hhmm) {
+  async function setTime(hhmm) {
     try {
       Utils.setSimulatedTime(hhmm);
     } catch (err) {
-      alert(err && err.message ? err.message : 'Jam tidak valid.');
+      await Utils.alertDialog(err && err.message ? err.message : 'Jam tidak valid.');
       return;
     }
     render();
@@ -68,14 +68,14 @@ const Simulator = (() => {
     refreshDashboard();
   }
 
-  function resetDemo() {
-    if (!confirm('Reset demo hari ini?\n\nSemua absen, kupon, pulang, presensi, overtime, dan riwayat scan HARI INI (jam simulasi) akan dihapus supaya alur bisa diulang dari scan 1.\n\nData karyawan, foto, dan data hari lain TIDAK dihapus.')) return;
+  async function resetDemo() {
+    if (!(await Utils.confirmDialog('Reset demo hari ini?\n\nSemua absen, kupon, pulang, presensi, overtime, dan riwayat scan HARI INI (jam simulasi) akan dihapus supaya alur bisa diulang dari scan 1.\n\nData karyawan, foto, dan data hari lain TIDAK dihapus.'))) return;
     const today = Storage.resetDemoHariIni();
     render();
     refreshDashboard();
     try { if (typeof Karyawan !== 'undefined') Karyawan.render(); } catch { /* ignore */ }
     try { if (typeof Presensi !== 'undefined') Presensi.render(); } catch { /* ignore */ }
-    alert('Demo hari ini (' + today + ') sudah direset. Silakan mulai lagi dari jam 08:05.');
+    await Utils.alertDialog('Demo hari ini (' + today + ') sudah direset. Silakan mulai lagi dari jam 08:05.');
   }
 
   function hitung() {
@@ -104,9 +104,9 @@ const Simulator = (() => {
     document.querySelectorAll('[data-sim-time]').forEach((btn) => {
       btn.addEventListener('click', () => setTime(btn.dataset.simTime));
     });
-    document.getElementById('btnSimSet')?.addEventListener('click', () => {
+    document.getElementById('btnSimSet')?.addEventListener('click', async () => {
       const v = document.getElementById('simCustomTime')?.value;
-      if (!v) { alert('Isi jam dulu, contoh 09:30.'); return; }
+      if (!v) { await Utils.alertDialog('Isi jam dulu, contoh 09:30.'); return; }
       setTime(v);
     });
     document.getElementById('btnSimRealtime')?.addEventListener('click', backToRealtime);

@@ -258,7 +258,7 @@ const Reservasi = (() => {
     }
   }
 
-  function tambah() {
+  async function tambah() {
     const idEl = document.getElementById('trId');
     const tanggalEl = document.getElementById('trTanggal');
     const lemburEl = document.getElementById('trLembur');
@@ -272,18 +272,18 @@ const Reservasi = (() => {
     const keterangan = (ketEl.value || '').trim();
 
     /* --- Validasi dasar --- */
-    if (!id) { alert('ID Karyawan wajib diisi!'); idEl.focus(); return; }
-    if (!tanggal) { alert('Tanggal Reservasi wajib diisi!'); tanggalEl.focus(); return; }
+    if (!id) { await Utils.alertDialog('ID Karyawan wajib diisi!'); idEl.focus(); return; }
+    if (!tanggal) { await Utils.alertDialog('Tanggal Reservasi wajib diisi!'); tanggalEl.focus(); return; }
 
     const karyawan = Karyawan.cari(id);
     if (!karyawan) {
-      alert(`Karyawan dengan ID "${id}" tidak ditemukan!`);
+      await Utils.alertDialog(`Karyawan dengan ID "${id}" tidak ditemukan!`);
       idEl.focus();
       return;
     }
 
     if (Utils.isKaryawanNonAktif(karyawan)) {
-      alert(
+      await Utils.alertDialog(
         `Karyawan ${karyawan.nama} (${karyawan.id}) berstatus Non-Aktif.\n\n` +
         'Tidak dapat menambahkan reservasi / kupon makan untuk karyawan non-aktif.'
       );
@@ -299,7 +299,7 @@ const Reservasi = (() => {
       const statusInfo = duplicateManual.released
         ? `sudah di-release (kode: ${duplicateManual.kode || '-'})`
         : 'belum di-release';
-      alert(
+      await Utils.alertDialog(
         `Reservasi untuk ${karyawan.nama} (${karyawan.id}) pada tanggal ${tanggal} sudah ada (${statusInfo}).\n\n` +
         'Satu karyawan hanya dapat memiliki 1 reservasi manual per tanggal.\n\n' +
         'Jika masih butuh kupon makan tambahan untuk lembur, gunakan menu Transaksi → Reservasi Overtime.'
@@ -313,7 +313,7 @@ const Reservasi = (() => {
       tanggal === TransaksiHelper.todayISO() &&
       Utils.isToday(karyawan.makanAt)
     ) {
-      alert(
+      await Utils.alertDialog(
         `${karyawan.nama} (${karyawan.id}) sudah memiliki reservasi hari ini via scan kupon.\n\n` +
         'Satu karyawan hanya dapat memiliki 1 kupon makan aktif per hari.\n\n' +
         'Jika ingin menambah jatah makan karena lembur, reset dulu lewat menu Transaksi → Reservasi Overtime.'
@@ -331,7 +331,7 @@ const Reservasi = (() => {
       return archTanggal === tanggal;
     });
     if (duplicateArchive) {
-      alert(
+      await Utils.alertDialog(
         `Karyawan ${karyawan.nama} (${karyawan.id}) sudah memiliki arsip reservasi pada tanggal ${tanggal}.\n\n` +
         'Tidak dapat menambahkan reservasi ganda untuk tanggal yang sama.'
       );
@@ -361,7 +361,7 @@ const Reservasi = (() => {
   }
 
   /* ---------- [2.6] RELEASE MANUAL (quick action) ---------- */
-  function releaseManual(ref) {
+  async function releaseManual(ref) {
     if (!ref) return;
     const sep = ref.indexOf(':');
     if (sep < 0) return;
@@ -370,17 +370,17 @@ const Reservasi = (() => {
     if (kind !== 'manual') return;
 
     if (
-      !confirm(
+      !(await Utils.confirmDialog(
         'Release reservasi manual ini?\n\n' +
           'Kode transaksi akan dibuat dan reservasi ini masuk ke urutan transaksi.'
-      )
+      ))
     ) {
       return;
     }
 
     const list = Storage.getReservasiManual();
     const r = list.find((x) => x.id === id);
-    if (!r) { alert('Reservasi tidak ditemukan.'); return; }
+    if (!r) { await Utils.alertDialog('Reservasi tidak ditemukan.'); return; }
     if (r.released) { render(); return; }
 
     if (!r.kode) r.kode = Utils.nextKodeTransaksi();
@@ -626,7 +626,7 @@ const ReservasiOvertime = (() => {
   }
 
   /* ---------- [3.2] Reset reservasi (form utama) ---------- */
-  function resetReservasi() {
+  async function resetReservasi() {
     if (typeof Storage.autoReleaseStaleOvertime === 'function') {
       Storage.autoReleaseStaleOvertime();
     }
@@ -637,18 +637,18 @@ const ReservasiOvertime = (() => {
     const id = (idEl.value || '').trim();
     const tanggal = (tanggalEl.value || '').trim();
 
-    if (!id) { alert('ID Karyawan wajib diisi!'); idEl.focus(); return; }
-    if (!tanggal) { alert('Tanggal wajib diisi!'); tanggalEl.focus(); return; }
+    if (!id) { await Utils.alertDialog('ID Karyawan wajib diisi!'); idEl.focus(); return; }
+    if (!tanggal) { await Utils.alertDialog('Tanggal wajib diisi!'); tanggalEl.focus(); return; }
 
     const karyawan = Karyawan.cari(id);
     if (!karyawan) {
-      alert(`Karyawan dengan ID "${id}" tidak ditemukan!`);
+      await Utils.alertDialog(`Karyawan dengan ID "${id}" tidak ditemukan!`);
       idEl.focus();
       return;
     }
 
     if (Utils.isKaryawanNonAktif(karyawan)) {
-      alert(
+      await Utils.alertDialog(
         `Karyawan ${karyawan.nama} (${karyawan.id}) berstatus Non-Aktif.\n\n` +
         'Tidak dapat melakukan reset reservasi / menandai lembur untuk karyawan non-aktif.'
       );
@@ -663,7 +663,7 @@ const ReservasiOvertime = (() => {
         String(r.tanggal || '').slice(0, 10) === tanggal
     );
     if (duplicateOvertime) {
-      alert(
+      await Utils.alertDialog(
         `Reset/overtime untuk ${karyawan.nama} (${karyawan.id}) pada tanggal ${tanggal} sudah pernah dilakukan ` +
         `(kode: ${duplicateOvertime.id}).\n\n` +
         'Reset hanya berlaku 1× per karyawan per tanggal dan tidak dapat diulang.'
@@ -684,7 +684,7 @@ const ReservasiOvertime = (() => {
           Utils.toLocalISODate(r.archivedAt) === today
       );
       if (sudahReset) {
-        alert(
+        await Utils.alertDialog(
           `${karyawan.nama} (${karyawan.id}) sudah pernah direset hari ini.\n\n` +
           'Reset hanya berlaku untuk 1× pengambilan makan tambahan.'
         );
@@ -718,7 +718,7 @@ const ReservasiOvertime = (() => {
     }
     msg += 'Lanjutkan?';
 
-    if (!confirm(msg)) return;
+    if (!(await Utils.confirmDialog(msg))) return;
 
     let archived = false;
     const nowIso = Utils.nowIso();
@@ -793,7 +793,7 @@ const ReservasiOvertime = (() => {
     refreshLain();
 
     if (archived) {
-      alert(
+      await Utils.alertDialog(
         `Reservasi ${karyawan.nama} berhasil direset.\n\n` +
         'Karyawan dapat mengambil kupon makan tambahan (hanya 1×) melalui:\n' +
         '  • Scan QR di Dashboard, atau\n' +
@@ -802,7 +802,7 @@ const ReservasiOvertime = (() => {
         'Overtime akan otomatis Released pada hari berikutnya.'
       );
     } else {
-      alert(
+      await Utils.alertDialog(
         `Overtime untuk ${karyawan.nama} berhasil ditandai.\n` +
         'Karyawan belum memiliki reservasi aktif; silakan scan kupon makan atau tambah reservasi manual (hanya 1×).\n\n' +
         'Overtime akan otomatis Released pada hari berikutnya.'
@@ -876,10 +876,10 @@ const ReservasiOvertime = (() => {
     refreshLain();
   }
 
-  function hapus(id) {
+  async function hapus(id) {
     const targetId = id || editingId;
     if (!targetId) return;
-    if (!confirm('Hapus data overtime ini? Tindakan tidak dapat dibatalkan.')) return;
+    if (!(await Utils.confirmDialog('Hapus data overtime ini? Tindakan tidak dapat dibatalkan.'))) return;
 
     Storage.setOvertime(Storage.getOvertime().filter((r) => r.id !== targetId));
     Storage.save();

@@ -33,6 +33,7 @@ const Dashboard = (() => {
     Storage.getReservasiManual().forEach((r) => {
       if (!r || !r.karyawanId) return;
       if (Utils.toLocalISODate(r.tanggal || r.createdAt) !== today) return;
+      if (!r.released) return; // reservasi manual yang belum di-release bukan kupon yang sudah diambil
       kuponKeys.add(r.kode ? 'K:' + r.kode : 'RM:' + r.id);
     });
 

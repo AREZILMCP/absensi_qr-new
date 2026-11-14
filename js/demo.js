@@ -111,10 +111,10 @@ const Demo = (() => {
   function bindUI() {
     const toggle = document.getElementById('demoToggle');
     if (toggle) {
-      toggle.addEventListener('change', () => {
+      toggle.addEventListener('change', async () => {
         const on = toggle.checked;
         if (!on && typeof Auth !== 'undefined' && Auth.isLoggedIn()) {
-          if (!confirm('Matikan Mode Demo? Sesi demo ditutup dan kamu kembali ke login server.')) {
+          if (!(await Utils.confirmDialog('Matikan Mode Demo? Sesi demo ditutup dan kamu kembali ke login server.'))) {
             toggle.checked = true;
             syncUI();
             return;
@@ -129,8 +129,8 @@ const Demo = (() => {
 
     const badge = document.getElementById('demoBadge');
     if (badge) {
-      badge.addEventListener('click', () => {
-        if (!confirm('Matikan Mode Demo dan kembali ke login server?')) return;
+      badge.addEventListener('click', async () => {
+        if (!(await Utils.confirmDialog('Matikan Mode Demo dan kembali ke login server?'))) return;
         turnOffAndReload();
       });
     }

@@ -194,9 +194,9 @@ const Foto = (() => {
     }
   }
 
-  function hapusFoto() {
+  async function hapusFoto() {
     if (!editingId) return;
-    if (!confirm('Hapus foto karyawan ini?')) return;
+    if (!(await Utils.confirmDialog('Hapus foto karyawan ini?'))) return;
 
     const k = cari(editingId);
     if (!k) return;
