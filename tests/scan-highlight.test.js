@@ -7,6 +7,8 @@
    (tanpa antrean). Kupon makan otomatis terbit + ditebus satu scan.
    Kamera persegi 1:1 (aspect-ratio + video 100% + ResizeObserver);
    baris "Terakhir" di panel kanan hero; kunci data demo v2.
+   Tombol nyala/mati kamera (#btnToggleCamera, manual-off dihormati
+   auto-start dan kiosk; label mengikuti status via hook).
    Yang TIDAK diuji di sini (butuh browser + kamera asli): alur scan
    end-to-end lewat kamera sungguhan.
    Jalankan: node tests/scan-highlight.test.js */
@@ -862,6 +864,27 @@ async function main() {
     assert(doc.documentElement.requestFullscreenCalls === 1, 'fullscreen tetap diminta');
   });
 
+  await test('kiosk: enable() tidak menyalakan kamera bila manual-off (tombol mati)', async () => {
+    const doc = makeDocument();
+    const localStorage = makeLocalStorage();
+    // Flag manual-off dari main.js (dicerminkan ke body dataset).
+    doc.body.dataset = { cameraManualOff: '1' };
+    const scannerStub = {
+      active: false,
+      startCalls: 0, stopCalls: 0,
+      isActive() { return this.active; },
+      async start() { this.startCalls += 1; this.active = true; },
+      async stop() { this.stopCalls += 1; this.active = false; },
+    };
+    const sandbox = { console, document: doc, localStorage, Scanner: scannerStub };
+    vm.createContext(sandbox);
+    vm.runInContext(read('js/kiosk.js'), sandbox, { filename: 'kiosk.js' });
+    vm.runInContext('globalThis.__Kiosk = Kiosk;', sandbox);
+    await sandbox.__Kiosk.enable();
+    assert(scannerStub.startCalls === 0, 'kamera manual-off tidak boleh dinyalakan kiosk');
+    assert(doc.documentElement.requestFullscreenCalls === 1, 'fullscreen tetap diminta');
+  });
+
   await test('kiosk: fullscreenchange restart scanner (video/qrbox dihitung ulang)', async () => {
     const doc = makeDocument();
     const localStorage = makeLocalStorage();
@@ -907,12 +930,14 @@ async function main() {
 
   console.log('== pivot dashboard = layar scan (file statis + utils asli) ==');
 
-  await test('index.html: ada jam topbar + gate layer; tanpa tombol Mulai/Stop/Buka Halaman Scan', async () => {
+  await test('index.html: ada jam topbar + gate layer + tombol nyala/mati kamera; tanpa tombol Mulai/Stop/Buka Halaman Scan', async () => {
     const html = read('index.html');
     assertHas(html, 'id="dashClockTime"');
     assertHas(html, 'id="dashClockDate"');
     assertHas(html, 'id="gateLayer"');
-    assertHas(html, 'css/style.css?v=dashfix1');
+    assertHas(html, 'id="btnToggleCamera"');
+    assertHas(html, 'Nyalakan Kamera');
+    assertHas(html, 'css/style.css?v=camtoggle1');
     assert(!html.includes('data-scan-start'), 'tidak boleh ada tombol Mulai Scan');
     assert(!html.includes('data-scan-stop'), 'tidak boleh ada tombol Stop');
     assert(!html.includes('btnOpenScanPage'), 'tidak boleh ada tombol Buka Halaman Scan');
@@ -953,6 +978,7 @@ async function main() {
     assertHas(css, 'max-width: 560px');
     assertHas(css, 'clamp(230px, 34vh, 360px)');
     assertHas(css, '.scan-last');
+    assertHas(css, '.camera-toggle');
     assert(!css.includes('.hero-hint {'), 'aturan .hero-hint harus sudah dihapus');
   });
 
@@ -982,6 +1008,26 @@ async function main() {
     assertHas(src, 'setTimeout(startDashboardScanner, 300)');
     assertHas(src, "panel-dashboard");
     assertHas(src, "if (tab === 'dashboard')");
+  });
+
+  await test('main.js: tombol nyala/mati kamera — manual-off menghalangi auto-start, nyala lewat jalur auto-start', async () => {
+    const src = read('js/main.js');
+    assertHas(src, 'btnToggleCamera');
+    assertHas(src, 'initCameraToggle');
+    assertHas(src, 'initCameraToggle();');
+    assertHas(src, 'onCameraToggleClick');
+    assertHas(src, 'cameraManualOff');
+    assertHas(src, 'setCameraManualOff');
+    assertHas(src, 'if (cameraManualOff) return;');
+    assertHas(src, 'syncCameraToggleLabel');
+    assertHas(src, 'setCameraStatusHook');
+    assertHas(src, "btn.textContent = on ? 'Matikan Kamera' : 'Nyalakan Kamera'");
+    assertHas(src, "document.body.dataset.cameraManualOff = '1'");
+    // Nyalakan memakai jalur auto-start yang sama (deferred + fitVideo).
+    assertHas(src, 'scheduleDashboardScanStart();');
+    // Matikan membatalkan auto-start yang masih tertunda + stop kamera.
+    assertHas(src, 'cancelPendingDashboardStart();');
+    assertHas(src, 'Scanner.stop()');
   });
 
   await test('main.js: baris Terakhir dihubungkan lewat Scanner.setResultHook', async () => {
@@ -1064,6 +1110,34 @@ async function main() {
     await ctx.__Scanner.start();
     const video = ctx.document.getElementById('reader').querySelector('video');
     assert(video.style.width === '100%', 'tanpa ResizeObserver pun video harus 100%');
+  });
+
+  await test('kamera: hook status dipanggil true saat start sukses, false saat stop', async () => {
+    const ctx = freshScannerCtx({ karyawan: [] });
+    const calls = [];
+    ctx.__Scanner.setCameraStatusHook((on) => calls.push(on));
+    await ctx.__Scanner.start();
+    assert(calls.length === 1 && calls[0] === true,
+      'start sukses harus memanggil hook(true), dapat ' + JSON.stringify(calls));
+    await ctx.__Scanner.stop();
+    assert(calls.length === 2 && calls[1] === false,
+      'stop harus memanggil hook(false), dapat ' + JSON.stringify(calls));
+  });
+
+  await test('kamera: start gagal (izin ditolak) memanggil hook(false) supaya tombol bisa retry', async () => {
+    const ctx = freshScannerCtx({ karyawan: [] });
+    const calls = [];
+    ctx.__Scanner.setCameraStatusHook((on) => calls.push(on));
+    ctx.Html5Qrcode = class {
+      constructor() {}
+      start() { return Promise.reject(new Error('izin ditolak')); }
+      stop() { return Promise.resolve(); }
+      clear() {}
+    };
+    await ctx.__Scanner.start();
+    assert(ctx.__Scanner.isActive() === false, 'scanner harus tidak aktif setelah gagal start');
+    assert(calls.length === 1 && calls[0] === false,
+      'gagal start harus memanggil hook(false), dapat ' + JSON.stringify(calls));
   });
 
   await test('utils: formatJam + formatTanggalID (kode asli)', async () => {

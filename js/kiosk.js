@@ -45,6 +45,10 @@ const Kiosk = (() => {
   async function ensureCameraBeforeFullscreen() {
     try {
       if (typeof Scanner === 'undefined' || !Scanner) return false;
+      // Kamera sengaja dimatikan user lewat tombol (flag manual-off di
+      // main.js, dicerminkan ke body dataset) — jangan nyalakan lagi.
+      const ds = document.body && document.body.dataset;
+      if (ds && ds.cameraManualOff === '1') return false;
       if (typeof Scanner.isActive !== 'function' || Scanner.isActive()) return true;
       if (typeof Scanner.start !== 'function' || !scannerVisible()) return false;
       await Scanner.start();

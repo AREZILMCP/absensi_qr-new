@@ -28,6 +28,7 @@ const Scanner = (() => {
   // berikutnya langsung menggantikannya (tanpa antrean).
   let closeBound = false;
   let resultHook = null;
+  let cameraStatusHook = null;
 
   let soundEnabled = true;
   try { soundEnabled = localStorage.getItem(SOUND_KEY) !== '0'; } catch { /* abaikan */ }
@@ -73,10 +74,11 @@ const Scanner = (() => {
 
     if (typeof Html5Qrcode === 'undefined') {
       showSimple('Library scanner belum dimuat. Cek koneksi internet.', 'err');
+      notifyCameraStatus();
       return;
     }
 
-    if (!document.getElementById(TARGET_ID)) return;
+    if (!document.getElementById(TARGET_ID)) { notifyCameraStatus(); return; }
 
     html5QrCode = new Html5Qrcode(TARGET_ID);
     lastScan = { text: null, time: 0 };
@@ -97,12 +99,14 @@ const Scanner = (() => {
       html5QrCode = null;
       isScanning = false;
     }
+    notifyCameraStatus();
   }
 
   async function stop() {
     unwatchReaderSize();
     if (!html5QrCode) {
       isScanning = false;
+      notifyCameraStatus();
       return;
     }
     try {
@@ -113,6 +117,7 @@ const Scanner = (() => {
     } finally {
       html5QrCode = null;
       isScanning = false;
+      notifyCameraStatus();
     }
   }
 
@@ -642,6 +647,14 @@ const Scanner = (() => {
     return new Promise((r) => setTimeout(r, ms));
   }
 
+  // Hook status kamera: dipanggil tiap status berubah (start sukses /
+  // gagal, stop) supaya tombol nyala/mati di dashboard selalu sesuai
+  // status sebenarnya, tanpa polling.
+  function notifyCameraStatus() {
+    if (!cameraStatusHook) return;
+    try { cameraStatusHook(isScanning); } catch { /* abaikan */ }
+  }
+
   /* ------------------------------------------------------------
      [7] EXPORT API
      ------------------------------------------------------------ */
@@ -657,5 +670,7 @@ const Scanner = (() => {
     isSoundEnabled: () => soundEnabled,
     // Hook hasil scan (dipakai untuk baris "Terakhir"; dashboard memakai riwayat scan).
     setResultHook: (fn) => { resultHook = typeof fn === 'function' ? fn : null; },
+    // Hook status kamera (dipakai tombol nyala/mati di dashboard).
+    setCameraStatusHook: (fn) => { cameraStatusHook = typeof fn === 'function' ? fn : null; },
   };
 })();

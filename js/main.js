@@ -90,10 +90,70 @@
   }
   function startDashboardScanner() {
     dashStartTimer = null;
+    // Kamera sengaja dimatikan user lewat tombol — jangan nyalakan lagi.
+    if (cameraManualOff) return;
     if (typeof Scanner === 'undefined' || !Scanner.start) return;
     if (typeof Scanner.isActive === 'function' && Scanner.isActive()) return;
     if (!document.getElementById('panel-dashboard')?.classList.contains('active')) return;
     Scanner.start().catch(() => {});
+  }
+
+  // Tombol nyala/mati kamera (permintaan user 17 Nov 2026): kamera
+  // auto-start boleh dimatikan manual. Kamera yang sengaja dimatikan
+  // TIDAK dinyalakan lagi oleh auto-start / kiosk sampai user
+  // menyalakannya lewat tombol (flag in-memory — hilang saat reload).
+  let cameraManualOff = false;
+
+  function setCameraManualOff(on) {
+    cameraManualOff = !!on;
+    // Cerminkan ke DOM supaya kiosk.js (IIFE terpisah) bisa menghormati
+    // manual-off saat masuk Mode Kiosk (jangan nyalakan kamera).
+    try {
+      if (document.body && document.body.dataset) {
+        if (cameraManualOff) document.body.dataset.cameraManualOff = '1';
+        else delete document.body.dataset.cameraManualOff;
+      }
+    } catch { /* abaikan */ }
+  }
+
+  function syncCameraToggleLabel() {
+    const btn = document.getElementById('btnToggleCamera');
+    if (!btn) return;
+    const on = typeof Scanner !== 'undefined' && Scanner.isActive && Scanner.isActive();
+    btn.textContent = on ? 'Matikan Kamera' : 'Nyalakan Kamera';
+    btn.setAttribute('aria-pressed', String(on));
+    btn.classList.toggle('active', on);
+  }
+
+  function cancelPendingDashboardStart() {
+    if (dashStartTimer) { clearTimeout(dashStartTimer); dashStartTimer = null; }
+  }
+
+  async function onCameraToggleClick() {
+    if (typeof Scanner === 'undefined' || !Scanner.start || !Scanner.stop) return;
+    if (Scanner.isActive && Scanner.isActive()) {
+      // Matikan: batalkan auto-start yang masih tertunda, lalu stop.
+      cancelPendingDashboardStart();
+      setCameraManualOff(true);
+      try { await Scanner.stop(); } catch { /* abaikan */ }
+    } else {
+      // Nyalakan: hapus flag manual-off, lalu start lewat jalur yang
+      // sama dengan auto-start (tunggu layout settle + fitVideoToHero).
+      setCameraManualOff(false);
+      cancelPendingDashboardStart();
+      scheduleDashboardScanStart();
+    }
+    syncCameraToggleLabel();
+  }
+
+  function initCameraToggle() {
+    const btn = document.getElementById('btnToggleCamera');
+    if (!btn) return;
+    btn.addEventListener('click', onCameraToggleClick);
+    if (typeof Scanner !== 'undefined' && Scanner.setCameraStatusHook) {
+      Scanner.setCameraStatusHook(syncCameraToggleLabel);
+    }
+    syncCameraToggleLabel();
   }
 
   function activateTab(tab) {
@@ -587,6 +647,7 @@
     initScanToggles();
     initDashClock();
     initScanLast();
+    initCameraToggle();
     try { if (typeof Simulator !== 'undefined') Simulator.init(); } catch { /* ignore */ }
 
     if (Auth.isLoggedIn()) {

@@ -1543,6 +1543,14 @@ input.input-error:focus {
   box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
 }
 
+/* Tombol nyala/mati kamera di panel kanan hero (di bawah saklar mode).
+   Saat kamera aktif, tombol bernuansa merah supaya jelas itu tombol
+   untuk mematikan. */
+.camera-toggle.active {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
 .foot-sep {
   color: #cbd5e1;
 }
