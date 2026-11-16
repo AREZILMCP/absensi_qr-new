@@ -172,6 +172,13 @@
     document.getElementById('btnKioskToggle')?.addEventListener('click', () => {
       if (typeof Kiosk !== 'undefined') Kiosk.toggle();
     });
+
+    // Buka halaman scan khusus (scan.html) dengan mode yang sedang aktif
+    // di dashboard — halaman scan untuk PC standby di pintu/kantin.
+    document.getElementById('btnOpenScanPage')?.addEventListener('click', () => {
+      const mode = (typeof Scanner !== 'undefined' && Scanner.getMode) ? Scanner.getMode() : 'presensi';
+      window.open('scan.html?mode=' + encodeURIComponent(mode), '_blank');
+    });
     try { if (typeof Kiosk !== 'undefined') Kiosk.init(); } catch { /* abaikan */ }
   }
 

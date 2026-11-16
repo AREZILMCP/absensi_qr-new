@@ -611,6 +611,13 @@ function scanAutoResetLembur(PDO $pdo, array &$k, string $today, string $nowIso)
   return true;
 }
 
+function scanFormatDurasi(int $menit): string {
+  if ($menit < 60) return $menit . ' menit';
+  $j = intdiv($menit, 60);
+  $s = $menit % 60;
+  return $s === 0 ? $j . ' jam' : $j . ' jam ' . $s . ' menit';
+}
+
 function handleScan(PDO $pdo): void {
   requireLogin();
 
@@ -626,8 +633,14 @@ function handleScan(PDO $pdo): void {
   $waktuServer = $now->format('H:i:s');
   $waktuRiwayat = $now->format('d/m/Y, H.i.s');
   $menit = ((int)$now->format('H')) * 60 + ((int)$now->format('i'));
-  $menitPulang = 16 * 60; // 16:00
-  $menitLembur = 18 * 60; // > 18:00 (tepat 18:00 belum lembur)
+  // Model DINAMIS berbasis jam (17 Nov 2026) — sama dengan
+  // js/scanner.js decideScan(). Jam yang menentukan arti scan.
+  $menitMasukMax = 8 * 60;     // 08:00 tepat waktu
+  $menitToleransi = 15;         // sampai 08:15 terlambat, lewat itu block
+  $menitMakanMulai = 12 * 60;   // 12:00 jendela makan siang (inklusif)
+  $menitMakanAkhir = 13 * 60;   // 13:00 jendela makan siang (inklusif)
+  $menitPulang = 16 * 60;       // 16:00 check-out; lewat itu lembur
+  $menitLemburMakan = 120;      // ekstra makan bila lembur >= 120 mnt (>= 18:00)
 
   $k = scanKaryawan($pdo, $kode);
   if (!$k) {
@@ -651,99 +664,119 @@ function handleScan(PDO $pdo): void {
     scanArchiveStaleMeal($pdo, $k, $today, $nowIso);
 
     $absenToday = !empty($k['absen']) && scanIsToday($k['absen_at'] ?? null, $today);
-    $makanToday = !empty($k['makan']) && scanIsToday($k['makan_at'] ?? null, $today);
     $pulangToday = !empty($k['pulang_at']) && scanIsToday($k['pulang_at'], $today);
-    $stmt = $pdo->prepare('SELECT COUNT(*) FROM reservasi_manual WHERE karyawan_id = ? AND SUBSTR(COALESCE(tanggal, created_at),1,10) = ?');
-    $stmt->execute([$k['id'], $today]);
-    $manualToday = ((int)$stmt->fetchColumn()) > 0;
-    $kuponToday = $makanToday || $manualToday;
+    $pulangMenit = null;
+    if ($pulangToday && !empty($k['pulang_at'])) {
+      $pulangMenit = ((int)substr((string)$k['pulang_at'], 11, 2)) * 60 + ((int)substr((string)$k['pulang_at'], 14, 2));
+    }
+    $jenis = (($k['kupon_jenis'] ?? 'reguler') === 'lembur') ? 'lembur' : 'reguler';
+    $makanSiangToday = !empty($k['makan']) && scanIsToday($k['makan_at'] ?? null, $today) && $jenis === 'reguler' && ($k['kupon_status'] ?? '') === 'ditebus';
+    $ekstraMakanToday = !empty($k['makan']) && scanIsToday($k['makan_at'] ?? null, $today) && $jenis === 'lembur' && ($k['kupon_status'] ?? '') === 'ditebus';
 
     $type = 'ok'; $message = ''; $aksi = ''; $riwayatJenis = null; $riwayatTambahan = null; $lembur = false;
 
     if ($mode === 'kantin') {
-      // Hanya kupon dari scan presensi yang ditebus di sini (B7);
-      // kupon reservasi manual jalurnya tetap Release Reservasi.
-      if (!$makanToday) {
-        $type = 'warn'; $aksi = 'warn';
-        $message = 'Tidak ada kupon makan aktif hari ini — kupon belum diterbitkan (scan presensi dulu)';
-      } elseif (($k['kupon_status'] ?? '') === 'ditebus') {
-        $type = 'warn'; $aksi = 'warn';
-        $jam = substr((string)($k['kupon_ditebus_at'] ?? ''), 11, 5);
-        $message = 'Kupon makan sudah ditebus' . ($jam !== '' ? ' pukul ' . $jam : '') . ' — 1 kupon hanya berlaku 1×';
+      // Kupon OTOMATIS terbit + ditebus dalam satu scan (model dinamis).
+      // Kupon reservasi manual TIDAK disentuh di sini; jalurnya tetap
+      // Release Reservasi.
+      $jamMakan = $menit >= $menitMakanMulai && $menit <= $menitMakanAkhir;
+      $jamEkstra = $menit >= $menitPulang + $menitLemburMakan; // >= 18:00
+      if (!$jamMakan && !$jamEkstra) {
+        $type = 'warn'; $aksi = 'tolak';
+        $message = 'Di luar jam makan — makan siang 12:00–13:00, ekstra makan ≥18:00';
+      } elseif (!$absenToday) {
+        $type = 'warn'; $aksi = 'tolak';
+        $message = 'Belum absen masuk — makan butuh absensi masuk hari ini';
+      } elseif ($jamMakan) {
+        if ($makanSiangToday) {
+          $type = 'warn'; $aksi = 'tolak';
+          $message = 'Sudah ambil makan siang hari ini';
+        } else {
+          $kuponKode = scanNextKode($pdo, 'TR-' . $now->format('ym') . '-', [['reservasi_manual', 'kode'], ['reservasi_archive', 'kode'], ['karyawan', 'kupon_kode']]);
+          $pdo->prepare('UPDATE karyawan SET makan = 1, makan_at = ?, kupon_kode = ?, kupon_released = 1, kupon_released_at = ?, kupon_status = ?, kupon_jenis = ?, kupon_ditebus_at = ? WHERE id = ?')->execute([
+            $nowIso, $kuponKode, $nowIso, 'ditebus', 'reguler', $nowIso, $k['id'],
+          ]);
+          $k['makan'] = 1; $k['makan_at'] = $nowIso; $k['kupon_kode'] = $kuponKode;
+          $k['kupon_released'] = 1; $k['kupon_released_at'] = $nowIso;
+          $k['kupon_status'] = 'ditebus'; $k['kupon_jenis'] = 'reguler'; $k['kupon_ditebus_at'] = $nowIso;
+          scanInsertRiwayat($pdo, $waktuRiwayat, $k['nama'], 'Makan Siang');
+          $type = 'ok'; $aksi = 'makan-siang'; $riwayatJenis = 'Makan Siang';
+          $message = 'Makan siang berhasil — kupon otomatis terbit, silakan ambil makanan';
+        }
       } else {
-        $jenis = ($k['kupon_jenis'] ?? 'reguler') === 'lembur' ? 'lembur' : 'reguler';
-        $pdo->prepare("UPDATE karyawan SET kupon_status = 'ditebus', kupon_ditebus_at = ? WHERE id = ?")->execute([$nowIso, $k['id']]);
-        $k['kupon_status'] = 'ditebus'; $k['kupon_ditebus_at'] = $nowIso;
-        scanInsertRiwayat($pdo, $waktuRiwayat, $k['nama'], 'Tebus Kupon');
-        $type = 'ok'; $aksi = 'tebus'; $riwayatJenis = 'Tebus Kupon';
-        $message = 'Kupon makan ' . $jenis . ' berhasil ditebus di kantin';
+        // jamEkstra (>= 18:00)
+        $lemburMenit = ($pulangToday && $pulangMenit !== null) ? max(0, $pulangMenit - $menitPulang) : 0;
+        if (!$pulangToday || $lemburMenit < $menitLemburMakan) {
+          $type = 'warn'; $aksi = 'tolak';
+          $message = 'Belum 2 jam lembur — ekstra makan setelah lembur 2 jam (≥18:00)';
+        } elseif ($ekstraMakanToday) {
+          $type = 'warn'; $aksi = 'tolak';
+          $message = 'Sudah ambil ekstra makan hari ini';
+        } else {
+          // Arsipkan kupon makan siang sebelum diganti kupon lembur.
+          if (!empty($k['makan']) && scanIsToday($k['makan_at'] ?? null, $today)) {
+            scanArchiveKupon($pdo, $k, 'Makan siang (diganti kupon lembur)', $nowIso, 'Tidak');
+          }
+          $kuponKode = scanNextKode($pdo, 'TR-' . $now->format('ym') . '-', [['reservasi_manual', 'kode'], ['reservasi_archive', 'kode'], ['karyawan', 'kupon_kode']]);
+          $pdo->prepare('UPDATE karyawan SET makan = 1, makan_at = ?, kupon_kode = ?, kupon_released = 1, kupon_released_at = ?, kupon_status = ?, kupon_jenis = ?, kupon_ditebus_at = ? WHERE id = ?')->execute([
+            $nowIso, $kuponKode, $nowIso, 'ditebus', 'lembur', $nowIso, $k['id'],
+          ]);
+          $k['makan'] = 1; $k['makan_at'] = $nowIso; $k['kupon_kode'] = $kuponKode;
+          $k['kupon_released'] = 1; $k['kupon_released_at'] = $nowIso;
+          $k['kupon_status'] = 'ditebus'; $k['kupon_jenis'] = 'lembur'; $k['kupon_ditebus_at'] = $nowIso;
+          scanInsertRiwayat($pdo, $waktuRiwayat, $k['nama'], 'Ekstra Makan');
+          $type = 'ok'; $aksi = 'ekstra-makan'; $riwayatJenis = 'Ekstra Makan'; $lembur = true;
+          $message = 'Ekstra makan berhasil — kupon lembur otomatis terbit, silakan ambil makanan';
+        }
+      }
+    } elseif ($menit < $menitPulang) {
+      // Pagi: check-in (atau tolak: belum jam pulang / block terlambat)
+      if (!$absenToday) {
+        if ($menit > $menitMasukMax + $menitToleransi) {
+          $type = 'err'; $aksi = 'tolak';
+          $message = 'Check-in ditutup — terlambat melewati 08:15';
+        } else {
+          $pdo->prepare('UPDATE karyawan SET absen = 1, absen_at = ?, pulang_at = NULL WHERE id = ?')->execute([$nowIso, $k['id']]);
+          $k['absen'] = 1; $k['absen_at'] = $nowIso; $k['pulang_at'] = null;
+          $prId = 'PR-' . str_replace('-', '', $today) . '-' . $k['id'];
+          $pdo->prepare('INSERT INTO presensi (id, karyawan_id, nama, bagian, tanggal, masuk_at, keluar_at, lembur) VALUES (?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE masuk_at = VALUES(masuk_at)')->execute([
+            $prId, $k['id'], $k['nama'], $k['bagian'] ?? '', $today, $nowIso, null, 0,
+          ]);
+          scanInsertRiwayat($pdo, $waktuRiwayat, $k['nama'], 'Absensi');
+          $type = 'ok'; $aksi = 'masuk'; $riwayatJenis = 'Absensi';
+          $message = 'Absensi masuk berhasil dicatat';
+        }
+      } else {
+        $type = 'warn'; $aksi = 'tolak';
+        $message = 'Belum jam pulang — check-out mulai 16:00';
       }
     } elseif (!$absenToday) {
-      // STATE 1 — masuk
-      $pdo->prepare('UPDATE karyawan SET absen = 1, absen_at = ?, pulang_at = NULL WHERE id = ?')->execute([$nowIso, $k['id']]);
-      $k['absen'] = 1; $k['absen_at'] = $nowIso; $k['pulang_at'] = null;
-      $prId = 'PR-' . str_replace('-', '', $today) . '-' . $k['id'];
-      $pdo->prepare('INSERT INTO presensi (id, karyawan_id, nama, bagian, tanggal, masuk_at, keluar_at, lembur) VALUES (?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE masuk_at = VALUES(masuk_at)')->execute([
-        $prId, $k['id'], $k['nama'], $k['bagian'] ?? '', $today, $nowIso, null, 0,
-      ]);
-      scanInsertRiwayat($pdo, $waktuRiwayat, $k['nama'], 'Absensi');
-      $type = 'ok'; $aksi = 'masuk'; $riwayatJenis = 'Absensi';
-      $message = 'Absensi masuk berhasil dicatat';
-    } elseif (!$kuponToday) {
-      // STATE 2 — kupon terbit
-      $kuponKode = scanNextKode($pdo, 'TR-' . $now->format('ym') . '-', [['reservasi_manual', 'kode'], ['reservasi_archive', 'kode'], ['karyawan', 'kupon_kode']]);
-      $jenis = $pulangToday ? 'lembur' : 'reguler';
-      $pdo->prepare('UPDATE karyawan SET makan = 1, makan_at = ?, kupon_kode = ?, kupon_released = 1, kupon_released_at = ?, kupon_status = ?, kupon_jenis = ?, kupon_ditebus_at = NULL WHERE id = ?')->execute([
-        $nowIso, $kuponKode, $nowIso, 'terbit', $jenis, $k['id'],
-      ]);
-      $k['makan'] = 1; $k['makan_at'] = $nowIso; $k['kupon_kode'] = $kuponKode;
-      $k['kupon_released'] = 1; $k['kupon_released_at'] = $nowIso;
-      $k['kupon_status'] = 'terbit'; $k['kupon_jenis'] = $jenis; $k['kupon_ditebus_at'] = null;
-      scanInsertRiwayat($pdo, $waktuRiwayat, $k['nama'], 'Kupon Makan');
-      $type = 'ok'; $aksi = 'kupon'; $riwayatJenis = 'Kupon Makan';
-      $message = $pulangToday
-        ? 'Kupon Makan lembur (tambahan) berhasil diterbitkan — tebus di kantin'
-        : 'Kupon Makan berhasil diterbitkan — tebus di kantin';
-    } elseif (!$pulangToday) {
-      // STATE 3 — pulang
-      if ($menit < $menitPulang) {
-        $type = 'warn'; $aksi = 'warn';
-        $message = $makanToday
-          ? 'Sudah absen & kupon makan sudah terbit. Absen pulang mulai 16:00'
-          : 'Kupon makan hari ini sudah tercatat via reservasi manual';
-      } else {
-        $lembur = $menit > $menitLembur;
-        $pdo->prepare('UPDATE karyawan SET pulang_at = ? WHERE id = ?')->execute([$nowIso, $k['id']]);
-        $k['pulang_at'] = $nowIso;
-        $prId = 'PR-' . str_replace('-', '', $today) . '-' . $k['id'];
-        $stmt = $pdo->prepare('UPDATE presensi SET keluar_at = ?, lembur = ? WHERE id = ?');
-        $stmt->execute([$nowIso, $lembur ? 1 : 0, $prId]);
-        if ($stmt->rowCount() === 0) {
-          $pdo->prepare('INSERT INTO presensi (id, karyawan_id, nama, bagian, tanggal, masuk_at, keluar_at, lembur) VALUES (?,?,?,?,?,?,?,?)')->execute([
-            $prId, $k['id'], $k['nama'], $k['bagian'] ?? '', $today, $k['absen_at'] ?? $nowIso, $nowIso, $lembur ? 1 : 0,
-          ]);
-        }
-        scanInsertRiwayat($pdo, $waktuRiwayat, $k['nama'], 'Absensi Pulang');
-        $type = 'ok'; $aksi = 'pulang'; $riwayatJenis = 'Absensi Pulang';
-        if ($lembur) {
-          $direset = scanAutoResetLembur($pdo, $k, $today, $nowIso);
-          if ($direset) {
-            scanInsertRiwayat($pdo, $waktuRiwayat, $k['nama'], 'Lembur - Kupon Direset');
-            $riwayatTambahan = 'Lembur - Kupon Direset';
-            $message = 'Absensi pulang dicatat — LEMBUR: kupon makan direset, 1× kupon tambahan tersedia';
-          } else {
-            $message = 'Absensi pulang dicatat (lembur hari ini sudah pernah direset)';
-          }
-        } else {
-          $message = 'Absensi pulang berhasil dicatat';
-        }
-      }
+      $type = 'warn'; $aksi = 'tolak';
+      $message = 'Belum absen masuk hari ini';
+    } elseif ($pulangToday) {
+      $type = 'warn'; $aksi = 'tolak';
+      $message = 'Sudah absen pulang hari ini';
     } else {
-      // STATE 4 — sudah pulang
-      $type = 'warn'; $aksi = 'warn';
-      $message = ($k['kupon_status'] ?? '') === 'ditebus'
-        ? 'Sudah absen pulang & kupon makan hari ini sudah ditebus'
-        : 'Sudah absen pulang — kupon makan masih bisa ditebus di kantin';
+      // Check-out; lembur dihitung mulai lewat 16:00 (17:00 = 1 jam).
+      // Tidak ada lagi reset kupon lembur di sini — kupon lembur
+      // diterbitkan terpisah di kantin (ekstra makan).
+      $lemburMenit = $menit - $menitPulang;
+      $lembur = $lemburMenit > 0;
+      $pdo->prepare('UPDATE karyawan SET pulang_at = ? WHERE id = ?')->execute([$nowIso, $k['id']]);
+      $k['pulang_at'] = $nowIso;
+      $prId = 'PR-' . str_replace('-', '', $today) . '-' . $k['id'];
+      $stmt = $pdo->prepare('UPDATE presensi SET keluar_at = ?, lembur = ? WHERE id = ?');
+      $stmt->execute([$nowIso, $lembur ? 1 : 0, $prId]);
+      if ($stmt->rowCount() === 0) {
+        $pdo->prepare('INSERT INTO presensi (id, karyawan_id, nama, bagian, tanggal, masuk_at, keluar_at, lembur) VALUES (?,?,?,?,?,?,?,?)')->execute([
+          $prId, $k['id'], $k['nama'], $k['bagian'] ?? '', $today, $k['absen_at'] ?? $nowIso, $nowIso, $lembur ? 1 : 0,
+        ]);
+      }
+      scanInsertRiwayat($pdo, $waktuRiwayat, $k['nama'], 'Absensi Pulang');
+      $type = 'ok'; $aksi = 'pulang'; $riwayatJenis = 'Absensi Pulang';
+      $message = $lembur
+        ? 'Absensi pulang dicatat — Lembur ' . scanFormatDurasi($lemburMenit)
+        : 'Absensi pulang berhasil dicatat';
     }
 
     $pdo->commit();

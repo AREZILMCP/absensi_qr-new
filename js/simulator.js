@@ -2,13 +2,13 @@
    SIMULATOR — Mode Simulasi Waktu untuk demo / presentasi.
    Bukan untuk operasional sungguhan: jam sistem digeser lewat
    Utils.setSimulatedTime() (offset, tersimpan di localStorage),
-   jadi scan 1-2-3-4 bisa didemokan dalam hitungan menit:
-     08:05  scan 1 = absensi masuk
-     12:00  scan 2 = kupon makan reguler
-     15:55  scan 3 = ditolak, belum jam pulang (16:00)
-     16:05  scan 3 = absensi pulang (tanpa lembur)
-     18:05  scan 3 = absensi pulang + reset lembur
-     18:10  scan 4 = kupon makan lembur (tambahan)
+   jadi alur dinamis berbasis jam bisa didemokan dalam hitungan menit:
+     08:05  check-in (terlambat, masih tercatat)
+     12:00  makan siang (kupon otomatis terbit + ditebus)
+     15:55  scan pintu masuk = ditolak, belum jam pulang (16:00)
+     16:05  check-out (lembur 5 menit)
+     18:05  check-out (lembur 2 jam 5 menit)
+     18:10  ekstra makan (kupon lembur otomatis terbit + ditebus)
    Matikan simulasi ("Kembali ke realtime") sebelum dipakai
    operasional, dan pakai "Reset demo" untuk mengulang alur.
    ============================================================ */
@@ -18,12 +18,12 @@ const Simulator = (() => {
 
   const PRESETS = [
     { time: '07:55', label: '07:55 — sebelum masuk' },
-    { time: '08:05', label: '08:05 — absen masuk' },
-    { time: '12:00', label: '12:00 — kupon makan' },
+    { time: '08:05', label: '08:05 — check-in terlambat' },
+    { time: '12:00', label: '12:00 — makan siang' },
     { time: '15:55', label: '15:55 — coba pulang (ditolak)' },
-    { time: '16:05', label: '16:05 — pulang (tanpa lembur)' },
-    { time: '18:05', label: '18:05 — pulang lembur (reset kupon)' },
-    { time: '18:10', label: '18:10 — kupon lembur' },
+    { time: '16:05', label: '16:05 — pulang (lembur 5 mnt)' },
+    { time: '18:05', label: '18:05 — pulang (lembur 2 jam)' },
+    { time: '18:10', label: '18:10 — ekstra makan' },
   ];
 
   function render() {
@@ -104,7 +104,7 @@ const Simulator = (() => {
       '<li>Boleh pulang: <strong>' + ya(r.bolehPulang) + '</strong></li>' +
       '<li>Kupon reguler: <strong>' + ya(r.kuponReguler) + '</strong></li>' +
       '<li>Kupon lembur: <strong>' + ya(r.kuponLembur) + '</strong>' +
-      (r.kuponLembur ? ' (' + Utils.escapeHtml(Utils.formatDurasi(r.kuponLemburMenit)) + ' setelah 18:00)' : '') + '</li>' +
+      (r.kuponLembur ? ' (lembur ' + Utils.escapeHtml(Utils.formatDurasi(r.kuponLemburMenit)) + ' — ekstra makan boleh)' : '') + '</li>' +
       '</ul>' +
       '<div class="sim-verdict">' + Utils.escapeHtml(r.alasan) + '</div>';
   }

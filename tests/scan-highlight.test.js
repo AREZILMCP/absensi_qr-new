@@ -1,8 +1,12 @@
-/* Tes Node untuk UX highlight scan (plan UX §3-4, cakupan prototipe).
+/* Tes Node untuk UX highlight scan + model dinamis (plan UX §3-4).
    Menguji KODE ASLI js/scanner.js, js/dashboard.js, js/kiosk.js lewat
    vm dengan stub DOM/Utils/Storage — tanpa browser dan tanpa kamera.
+   Model scan DINAMIS berbasis jam (17 Nov 2026): jam yang menentukan
+   arti scan, bukan hitungan scan ke berapa (alur 1-2-3-4 dihapus).
+   Semua overlay auto-hilang 1 detik; scan baru langsung menggantikan
+   (tanpa antrean). Kupon makan otomatis terbit + ditebus satu scan.
    Yang TIDAK diuji di sini (butuh browser + kamera asli): alur scan
-   1-4 end-to-end lewat kamera sungguhan.
+   end-to-end lewat kamera sungguhan.
    Jalankan: node tests/scan-highlight.test.js */
 'use strict';
 
@@ -59,6 +63,7 @@ class El {
     this.textContent = '';
     this.hidden = false;
     this.style = {};
+    this.offsetParent = {}; // dianggap terlihat (untuk scannerVisible)
     this._listeners = {};
     this._badge = null;
     this._row = null;
@@ -112,18 +117,29 @@ function makeDocument() {
     documentElement: { requestFullscreenCalls: 0 },
     fullscreenElement: null,
     exitFullscreenCalls: 0,
+    _listeners: {},
     getElementById: (id) => get(id),
     querySelectorAll: () => [],
+    addEventListener: (type, fn) => {
+      (doc._listeners[type] = doc._listeners[type] || []).push(fn);
+    },
+    removeEventListener: (type, fn) => {
+      doc._listeners[type] = (doc._listeners[type] || []).filter((f) => f !== fn);
+    },
+    // Picu event untuk tes (mis. fullscreenchange).
+    _fire: (type) => { (doc._listeners[type] || []).forEach((fn) => fn()); },
   };
   // Closure di atas objek doc (bukan `document` global Node).
   doc.documentElement.requestFullscreen = () => {
     doc.documentElement.requestFullscreenCalls += 1;
     doc.fullscreenElement = doc.documentElement;
+    doc._fire('fullscreenchange');
     return Promise.resolve();
   };
   doc.exitFullscreen = () => {
     doc.exitFullscreenCalls += 1;
     doc.fullscreenElement = null;
+    doc._fire('fullscreenchange');
     return Promise.resolve();
   };
   return doc;
@@ -146,6 +162,7 @@ function freshScannerCtx(opts) {
     kodeSeq: 0,
     karyawan: o.karyawan || [],
     riwayat: [],
+    archive: [],
     presensi: [],
     dashboardRender: 0,
     karyawanRender: 0,
@@ -210,6 +227,11 @@ function freshScannerCtx(opts) {
       clear() {}
     },
     Utils: {
+      WORK: {
+        MASUK: '08:00', TOLERANSI_TERLAMBAT_MENIT: 15,
+        MAKAN_MULAI: '12:00', MAKAN_AKHIR: '13:00',
+        PULANG: '16:00', LEMBUR_SETELAH_MENIT: 120,
+      },
       escapeHtml: (v) => String(v == null ? '' : v)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;'),
@@ -218,8 +240,15 @@ function freshScannerCtx(opts) {
       todayLocalISO: () => todayStr(),
       toLocalISODate: (v) => (v ? String(v).slice(0, 10) : ''),
       isToday: (v) => !!v && String(v).slice(0, 10) === todayStr(),
+      menitHariIni: () => state.now.getHours() * 60 + state.now.getMinutes(),
+      formatDurasi: (menit) => {
+        if (menit < 60) return menit + ' menit';
+        const j = Math.floor(menit / 60);
+        const s = menit % 60;
+        return s === 0 ? j + ' jam' : j + ' jam ' + s + ' menit';
+      },
       isSudahJamPulang: () => state.now.getHours() * 60 + state.now.getMinutes() >= 16 * 60,
-      isLembur: () => state.now.getHours() * 60 + state.now.getMinutes() > 18 * 60,
+      isLembur: () => state.now.getHours() * 60 + state.now.getMinutes() > 16 * 60,
       formatJamPulang: () => '16:00',
       nextKodeTransaksi: () => 'TR-2611-' + String(++state.kodeSeq).padStart(3, '0'),
       isSimulated: () => false,
@@ -228,11 +257,14 @@ function freshScannerCtx(opts) {
     Storage: {
       getKaryawan: () => state.karyawan,
       getReservasiManual: () => [],
-      getReservasiArchive: () => [],
+      getReservasiArchive: () => state.archive,
       getPresensi: () => state.presensi,
       getRiwayat: () => state.riwayat,
       todayLocalISO: () => todayStr(),
       archiveStaleMeal: () => false,
+      archiveKupon: (k, ket) => {
+        state.archive.push({ karyawanId: k.id, keterangan: ket, kode: k.kuponKode });
+      },
       autoResetLembur: (k) => {
         k.makan = false; k.makanAt = null; k.kuponKode = null; k.kuponStatus = null;
         return true;
@@ -291,11 +323,11 @@ async function startAndScan(ctx, kode) {
 }
 
 async function main() {
-  console.log('== scanner.js — overlay highlight ==');
+  console.log('== scanner.js — model dinamis + overlay highlight ==');
 
-  await test('scan 1 masuk: overlay ok, nama besar, Tepat waktu', async () => {
+  await test('check-in 08:00: overlay ok, ABSENSI MASUK, Tepat waktu, timer 1 detik', async () => {
     const ctx = freshScannerCtx({ karyawan: [emp('K0001', 'Reza Kurnia')] });
-    ctx.__setNow(8, 0); // tepat waktu = masuk 08:00 (aturan: >08:00 terlambat)
+    ctx.__setNow(8, 0);
     const el = await startAndScan(ctx, 'K0001');
     assertHas(el.className, 'scan-overlay-ok');
     assertHas(el.innerHTML, 'ABSENSI MASUK');
@@ -303,123 +335,203 @@ async function main() {
     assertHas(el.innerHTML, 'scan-overlay-name');
     assertHas(el.innerHTML, 'Tepat waktu');
     assertHas(el.innerHTML, 'K0001');
-    assert(ctx.__pendingTimerMs()[0] === 3000, 'timer sukses harus 3000ms, dapat ' + ctx.__pendingTimerMs()[0]);
+    assert(ctx.__pendingTimerMs()[0] === 1000, 'timer sukses harus 1000ms, dapat ' + ctx.__pendingTimerMs()[0]);
     assert(ctx.__state.audioOsc.length === 1 && ctx.__state.audioOsc[0].frequency.value === 880,
       'beep sukses harus 1 osilator 880Hz');
     assert(ctx.__state.dashboardRender === 1, 'Dashboard.render harus terpanggil 1x');
   });
 
-  await test('scan 1 masuk terlambat: "Terlambat 10 menit"', async () => {
+  await test('check-in 08:05: "Terlambat 5 menit", tetap tercatat', async () => {
     const ctx = freshScannerCtx({ karyawan: [emp('K0001', 'Reza Kurnia')] });
-    ctx.__setNow(8, 10);
+    ctx.__setNow(8, 5);
     const el = await startAndScan(ctx, 'K0001');
-    assertHas(el.innerHTML, 'Terlambat 10 menit');
+    assertHas(el.innerHTML, 'Terlambat 5 menit');
+    assert(ctx.__state.karyawan[0].absen === true, '08:05 masih tercatat');
+    assert(ctx.__state.riwayat.length === 1, 'riwayat harus tercatat');
   });
 
-  await test('scan 2: KUPON MAKAN TERBIT + kode kupon besar', async () => {
-    const ctx = freshScannerCtx({
-      karyawan: [emp('K0001', 'Reza Kurnia', { absen: true, absenAt: '2026-11-16T08:05:00' })],
-    });
-    ctx.__setNow(12, 0);
+  await test('check-in 08:15 (batas toleransi): tercatat, "Terlambat 15 menit"', async () => {
+    const ctx = freshScannerCtx({ karyawan: [emp('K0001', 'Reza Kurnia')] });
+    ctx.__setNow(8, 15);
     const el = await startAndScan(ctx, 'K0001');
-    assertHas(el.className, 'scan-overlay-ok');
-    assertHas(el.innerHTML, 'KUPON MAKAN TERBIT');
-    assertHas(el.innerHTML, 'TR-2611-001');
-    assertHas(el.innerHTML, 'scan-overlay-kupon-kode');
-    assertHas(el.innerHTML, 'Tebus di kantin');
+    assertHas(el.innerHTML, 'Terlambat 15 menit');
+    assert(ctx.__state.karyawan[0].absen === true, '08:15 masih tercatat');
   });
 
-  await test('scan 3 pulang 16:05: ABSENSI PULANG tanpa lembur', async () => {
+  await test('check-in 08:16: DITOLAK, tidak tercatat', async () => {
+    const ctx = freshScannerCtx({ karyawan: [emp('K0001', 'Reza Kurnia')] });
+    ctx.__setNow(8, 16);
+    const el = await startAndScan(ctx, 'K0001');
+    assertHas(el.className, 'scan-overlay-err');
+    assertHas(el.innerHTML, 'DITOLAK');
+    assert(ctx.__state.karyawan[0].absen === false, '08:16 tidak boleh tercatat');
+    assert(ctx.__state.riwayat.length === 0, 'riwayat tidak boleh bertambah');
+    assert(ctx.__pendingTimerMs()[0] === 1000, 'timer err juga 1000ms');
+  });
+
+  await test('sudah check-in, scan 15:55: warn BELUM JAM PULANG', async () => {
     const ctx = freshScannerCtx({
       karyawan: [emp('K0001', 'Reza Kurnia', {
         absen: true, absenAt: '2026-11-16T08:05:00',
-        makan: true, makanAt: '2026-11-16T12:00:00', kuponKode: 'TR-2611-001', kuponStatus: 'terbit',
+        makan: true, makanAt: '2026-11-16T12:00:00', kuponKode: 'TR-2611-001', kuponStatus: 'ditebus',
       })],
     });
-    ctx.__setNow(16, 5);
+    ctx.__setNow(15, 55);
     const el = await startAndScan(ctx, 'K0001');
-    assertHas(el.innerHTML, 'ABSENSI PULANG');
-    assert(!el.innerHTML.includes('LEMBUR'), 'pulang 16:05 bukan lembur');
+    assertHas(el.className, 'scan-overlay-warn');
+    assertHas(el.innerHTML, 'BELUM JAM PULANG');
+    assert(ctx.__pendingTimerMs()[0] === 1000, 'timer warn juga 1000ms');
   });
 
-  await test('scan 3 pulang 18:05: lembur + kupon direset', async () => {
+  await test('check-out 16:00: ABSENSI PULANG, 0 lembur', async () => {
     const ctx = freshScannerCtx({
       karyawan: [emp('K0001', 'Reza Kurnia', {
         absen: true, absenAt: '2026-11-16T08:05:00',
-        makan: true, makanAt: '2026-11-16T12:00:00', kuponKode: 'TR-2611-001', kuponStatus: 'terbit',
+        makan: true, makanAt: '2026-11-16T12:00:00', kuponKode: 'TR-2611-001', kuponStatus: 'ditebus',
+      })],
+    });
+    ctx.__setNow(16, 0);
+    const el = await startAndScan(ctx, 'K0001');
+    assertHas(el.innerHTML, 'ABSENSI PULANG');
+    assert(!el.innerHTML.includes('Lembur'), 'pulang 16:00 = 0 lembur');
+    assert(ctx.__state.presensi.some((p) => p.lembur === false), 'presensi pulang tercatat tanpa lembur');
+  });
+
+  await test('check-out 17:00: ABSENSI PULANG + "Lembur 1 jam"', async () => {
+    const ctx = freshScannerCtx({
+      karyawan: [emp('K0001', 'Reza Kurnia', {
+        absen: true, absenAt: '2026-11-16T08:05:00',
+        makan: true, makanAt: '2026-11-16T12:00:00', kuponKode: 'TR-2611-001', kuponStatus: 'ditebus',
+      })],
+    });
+    ctx.__setNow(17, 0);
+    const el = await startAndScan(ctx, 'K0001');
+    assertHas(el.innerHTML, 'ABSENSI PULANG');
+    assertHas(el.innerHTML, 'Lembur 1 jam');
+    assert(ctx.__state.presensi.some((p) => p.lembur === true), 'lembur harus tercatat di presensi');
+  });
+
+  await test('check-out 18:05: "Lembur 2 jam 5 menit", kupon siang TIDAK direset', async () => {
+    const ctx = freshScannerCtx({
+      karyawan: [emp('K0001', 'Reza Kurnia', {
+        absen: true, absenAt: '2026-11-16T08:05:00',
+        makan: true, makanAt: '2026-11-16T12:00:00', kuponKode: 'TR-2611-001', kuponStatus: 'ditebus',
       })],
     });
     ctx.__setNow(18, 5);
     const el = await startAndScan(ctx, 'K0001');
     assertHas(el.innerHTML, 'ABSENSI PULANG');
-    assertHas(el.innerHTML, 'Lembur');
-    assertHas(el.innerHTML, 'kupon reguler direset');
+    assertHas(el.innerHTML, 'Lembur 2 jam 5 menit');
+    // Model dinamis: kupon lembur diterbitkan terpisah di kantin
+    // (ekstra makan), jadi pulang lembur tidak lagi mereset kupon.
+    assert(ctx.__state.karyawan[0].makan === true, 'kupon siang tidak direset saat pulang');
+    assert(ctx.__state.karyawan[0].kuponKode === 'TR-2611-001', 'kode kupon siang tetap');
   });
 
-  await test('scan 4: KUPON LEMBUR TERBIT + kode baru', async () => {
+  await test('sudah pulang, scan lagi: warn SUDAH PULANG', async () => {
     const ctx = freshScannerCtx({
-      // Seperti sesudah scan 3 lembur: kupon reguler sudah direset
-      // (makan=false) sehingga scan 4 menerbitkan kupon lembur.
       karyawan: [emp('K0001', 'Reza Kurnia', {
         absen: true, absenAt: '2026-11-16T08:05:00',
-        makan: false, makanAt: null, kuponKode: null, kuponStatus: null,
-        pulangAt: '2026-11-16T18:05:00',
+        makan: true, makanAt: '2026-11-16T12:00:00', kuponKode: 'TR-2611-001', kuponStatus: 'ditebus',
+        pulangAt: '2026-11-16T17:00:00',
       })],
     });
-    ctx.__setNow(18, 10);
+    ctx.__setNow(18, 5);
     const el = await startAndScan(ctx, 'K0001');
-    assertHas(el.innerHTML, 'KUPON LEMBUR TERBIT');
-    assertHas(el.innerHTML, 'TR-2611-001');
+    assertHas(el.className, 'scan-overlay-warn');
+    assertHas(el.innerHTML, 'SUDAH PULANG');
   });
 
-  await test('kantin tebus ok: KUPON DITEBUS + kode', async () => {
+  await test('kantin 12:00 makan siang: MAKAN SIANG + kode kupon besar, otomatis terbit+ditebus', async () => {
     const ctx = freshScannerCtx({
-      karyawan: [emp('K0001', 'Reza Kurnia', {
-        absen: true, absenAt: '2026-11-16T08:05:00',
-        makan: true, makanAt: '2026-11-16T12:00:00', kuponKode: 'TR-2611-001', kuponStatus: 'terbit',
-      })],
+      karyawan: [emp('K0001', 'Reza Kurnia', { absen: true, absenAt: '2026-11-16T08:05:00' })],
     });
-    ctx.__setNow(12, 3);
+    ctx.__setNow(12, 0);
     ctx.__Scanner.setMode('kantin');
     const el = await startAndScan(ctx, 'K0001');
-    assertHas(el.innerHTML, 'KUPON DITEBUS');
+    assertHas(el.className, 'scan-overlay-ok');
+    assertHas(el.innerHTML, 'MAKAN SIANG');
     assertHas(el.innerHTML, 'TR-2611-001');
+    assertHas(el.innerHTML, 'scan-overlay-kupon-kode');
+    const k = ctx.__state.karyawan[0];
+    assert(k.makan === true && k.kuponStatus === 'ditebus' && k.kuponJenis === 'reguler',
+      'kupon harus terbit + ditebus sekaligus, jenis reguler');
+    assert(ctx.__state.riwayat[0].jenis === 'Makan Siang', 'riwayat Makan Siang tercatat');
   });
 
-  await test('kantin tebus ganda: warn SUDAH DITEBUS, timer 4000', async () => {
+  await test('kantin sudah makan: warn SUDAH AMBIL MAKAN', async () => {
     const ctx = freshScannerCtx({
       karyawan: [emp('K0001', 'Reza Kurnia', {
         absen: true, absenAt: '2026-11-16T08:05:00',
         makan: true, makanAt: '2026-11-16T12:00:00',
-        kuponKode: 'TR-2611-001', kuponStatus: 'ditebus', kuponDitebusAt: '2026-11-16T12:03:00',
+        kuponKode: 'TR-2611-001', kuponStatus: 'ditebus', kuponJenis: 'reguler',
       })],
     });
     ctx.__setNow(12, 30);
     ctx.__Scanner.setMode('kantin');
     const el = await startAndScan(ctx, 'K0001');
     assertHas(el.className, 'scan-overlay-warn');
-    assertHas(el.innerHTML, 'SUDAH DITEBUS');
-    assert(ctx.__pendingTimerMs()[0] === 4000, 'timer warn harus 4000ms');
+    assertHas(el.innerHTML, 'SUDAH AMBIL MAKAN');
     assert(ctx.__state.audioOsc.length === 2, 'beep warn harus 2 nada');
   });
 
-  await test('kantin tanpa kupon: warn TIDAK ADA KUPON', async () => {
+  await test('kantin 11:59 (di luar jendela): warn DI LUAR JAM MAKAN', async () => {
     const ctx = freshScannerCtx({
       karyawan: [emp('K0001', 'Reza Kurnia', { absen: true, absenAt: '2026-11-16T08:05:00' })],
     });
-    ctx.__setNow(12, 0);
+    ctx.__setNow(11, 59);
     ctx.__Scanner.setMode('kantin');
     const el = await startAndScan(ctx, 'K0001');
     assertHas(el.className, 'scan-overlay-warn');
-    assertHas(el.innerHTML, 'TIDAK ADA KUPON');
+    assertHas(el.innerHTML, 'DI LUAR JAM MAKAN');
   });
 
-  await test('QR tidak dikenal: err QR TIDAK DIKENALI, timer 5000', async () => {
+  await test('kantin 18:05 ekstra makan (lembur 2 jam 5 mnt): EKSTRA MAKAN + kupon lembur', async () => {
+    const ctx = freshScannerCtx({
+      karyawan: [emp('K0001', 'Reza Kurnia', {
+        absen: true, absenAt: '2026-11-16T08:05:00',
+        makan: true, makanAt: '2026-11-16T12:00:00',
+        kuponKode: 'TR-2611-000', kuponStatus: 'ditebus', kuponJenis: 'reguler',
+        pulangAt: '2026-11-16T18:05:00',
+      })],
+    });
+    ctx.__setNow(18, 5);
+    ctx.__Scanner.setMode('kantin');
+    const el = await startAndScan(ctx, 'K0001');
+    assertHas(el.className, 'scan-overlay-ok');
+    assertHas(el.innerHTML, 'EKSTRA MAKAN');
+    assertHas(el.innerHTML, 'TR-2611-001');
+    const k = ctx.__state.karyawan[0];
+    assert(k.kuponJenis === 'lembur' && k.kuponStatus === 'ditebus',
+      'kupon lembur harus terbit + ditebus');
+    assert(ctx.__state.archive.length === 1 &&
+      ctx.__state.archive[0].keterangan === 'Makan siang (diganti kupon lembur)',
+      'kupon siang lama harus diarsipkan dulu');
+    assert(ctx.__state.riwayat[0].jenis === 'Ekstra Makan', 'riwayat Ekstra Makan tercatat');
+  });
+
+  await test('kantin 18:00 lembur < 2 jam (pulang 16:05): warn BELUM 2 JAM LEMBUR', async () => {
+    const ctx = freshScannerCtx({
+      karyawan: [emp('K0001', 'Reza Kurnia', {
+        absen: true, absenAt: '2026-11-16T08:05:00',
+        makan: true, makanAt: '2026-11-16T12:00:00',
+        kuponKode: 'TR-2611-001', kuponStatus: 'ditebus', kuponJenis: 'reguler',
+        pulangAt: '2026-11-16T16:05:00',
+      })],
+    });
+    ctx.__setNow(18, 0);
+    ctx.__Scanner.setMode('kantin');
+    const el = await startAndScan(ctx, 'K0001');
+    assertHas(el.className, 'scan-overlay-warn');
+    assertHas(el.innerHTML, 'BELUM 2 JAM LEMBUR');
+  });
+
+  await test('QR tidak dikenal: err QR TIDAK DIKENALI, timer 1 detik, beep 220Hz', async () => {
     const ctx = freshScannerCtx({ karyawan: [emp('K0001', 'Reza Kurnia')] });
     const el = await startAndScan(ctx, 'K9999');
     assertHas(el.className, 'scan-overlay-err');
     assertHas(el.innerHTML, 'QR TIDAK DIKENALI');
-    assert(ctx.__pendingTimerMs()[0] === 5000, 'timer err harus 5000ms');
+    assert(ctx.__pendingTimerMs()[0] === 1000, 'timer err harus 1000ms');
     assert(ctx.__state.audioOsc.length === 1 && ctx.__state.audioOsc[0].frequency.value === 220,
       'beep err harus 1 osilator 220Hz');
   });
@@ -433,19 +545,6 @@ async function main() {
     assertHas(el.innerHTML, 'DITOLAK');
   });
 
-  await test('pulang sebelum 16:00: warn SUDAH TERCATAT', async () => {
-    const ctx = freshScannerCtx({
-      karyawan: [emp('K0001', 'Reza Kurnia', {
-        absen: true, absenAt: '2026-11-16T08:05:00',
-        makan: true, makanAt: '2026-11-16T12:00:00', kuponKode: 'TR-2611-001', kuponStatus: 'terbit',
-      })],
-    });
-    ctx.__setNow(15, 55);
-    const el = await startAndScan(ctx, 'K0001');
-    assertHas(el.className, 'scan-overlay-warn');
-    assertHas(el.innerHTML, 'SUDAH TERCATAT');
-  });
-
   await test('duplikat QR sama dalam 2 detik diabaikan', async () => {
     const ctx = freshScannerCtx({ karyawan: [emp('K0001', 'Reza Kurnia')] });
     await ctx.__Scanner.start();
@@ -453,10 +552,9 @@ async function main() {
     const riwayat1 = ctx.__state.riwayat.length;
     await ctx.__decode('K0001'); // <2 detik (waktu nyata) -> diabaikan
     assert(ctx.__state.riwayat.length === riwayat1, 'scan duplikat harus diabaikan');
-    assert(ctx.__Scanner.getWaitingCount() === 0, 'duplikat tidak masuk antrean');
   });
 
-  await test('antrean: scan B menunggu saat overlay A tampil, lalu tampil', async () => {
+  await test('tanpa antrean: scan B langsung menggantikan A (tanpa badge menunggu)', async () => {
     const ctx = freshScannerCtx({
       karyawan: [emp('K0001', 'Reza Kurnia'), emp('K0002', 'Rio Andika')],
     });
@@ -465,46 +563,39 @@ async function main() {
     const el = ctx.document.getElementById('resultScan');
     assertHas(el.innerHTML, 'Reza Kurnia');
     await ctx.__decode('K0002');
-    assertHas(el.innerHTML, 'Reza Kurnia', 'hasil A tidak boleh tertimpa B');
-    assert(ctx.__Scanner.getWaitingCount() === 1, 'waiting harus 1');
-    const badge = el.querySelector('.scan-overlay-waiting');
-    assert(badge && !badge.hidden && badge.textContent === '+1 scan menunggu',
-      'badge menunggu harus "+1 scan menunggu"');
-    ctx.__runOneTimer(); // timer A habis -> B tampil
-    assertHas(el.innerHTML, 'Rio Andika');
-    assert(ctx.__Scanner.getWaitingCount() === 0, 'antrean habis setelah B tampil');
+    assertHas(el.innerHTML, 'Rio Andika', 'hasil B harus langsung menggantikan A');
+    assert(!el.innerHTML.includes('Reza Kurnia'), 'A tidak boleh menetap');
+    assert(!el.innerHTML.includes('scan-overlay-waiting'), 'tidak boleh ada badge menunggu');
+    assert(typeof ctx.__Scanner.getWaitingCount === 'undefined', 'getWaitingCount sudah dihapus');
+    assert(ctx.__pendingTimerMs().length === 1 && ctx.__pendingTimerMs()[0] === 1000,
+      'hanya satu timer 1000ms yang berjalan');
   });
 
-  await test('antrean maks 1: B lalu C, yang tampil C (terbaru)', async () => {
-    const ctx = freshScannerCtx({
-      karyawan: [emp('K0001', 'Reza Kurnia'), emp('K0002', 'Rio Andika'), emp('K0003', 'Orta Dinanti')],
-    });
-    await ctx.__Scanner.start();
-    await ctx.__decode('K0001');
-    const el = ctx.document.getElementById('resultScan');
-    await ctx.__decode('K0002');
-    await ctx.__decode('K0003');
-    assert(ctx.__Scanner.getWaitingCount() === 2, 'dua scan masuk saat overlay tampil');
-    const badge = el.querySelector('.scan-overlay-waiting');
-    assert(badge && badge.textContent === '+2 scan menunggu', 'badge harus "+2 scan menunggu"');
-    ctx.__runOneTimer(); // timer A habis -> C (terbaru) tampil, B dilewat
-    assertHas(el.innerHTML, 'Orta Dinanti');
-    assert(!el.innerHTML.includes('Rio Andika'), 'B yang tertimpa tidak tampil');
-    assert(ctx.__Scanner.getWaitingCount() === 0, 'hitungan menunggu reset setelah antrean tampil');
+  await test('timer 1 detik: overlay hilang sendiri setelah timer jalan', async () => {
+    const ctx = freshScannerCtx({ karyawan: [emp('K0001', 'Reza Kurnia')] });
+    const el = await startAndScan(ctx, 'K0001');
+    assertHas(el.className, 'show');
+    const ms = ctx.__runOneTimer();
+    assert(ms === 1000, 'timer harus 1000ms, dapat ' + ms);
+    assert(el.innerHTML === '' && !el.className.includes('show'), 'overlay harus hilang setelah 1 detik');
   });
 
-  await test('tombol Tutup: dismiss menampilkan antrean berikutnya', async () => {
-    const ctx = freshScannerCtx({
-      karyawan: [emp('K0001', 'Reza Kurnia'), emp('K0002', 'Rio Andika')],
-    });
-    await ctx.__Scanner.start();
-    await ctx.__decode('K0001');
-    await ctx.__decode('K0002');
+  await test('tombol Tutup: dismissResult membersihkan overlay', async () => {
+    const ctx = freshScannerCtx({ karyawan: [emp('K0001', 'Reza Kurnia')] });
+    const el = await startAndScan(ctx, 'K0001');
+    assertHas(el.innerHTML, 'Reza Kurnia');
     ctx.__Scanner.dismissResult();
-    const el = ctx.document.getElementById('resultScan');
-    assertHas(el.innerHTML, 'Rio Andika', 'dismiss harus memunculkan antrean');
-    ctx.__Scanner.dismissResult();
-    assert(el.innerHTML === '' && !el.className.includes('show'), 'overlay harus hilang setelah dismiss terakhir');
+    assert(el.innerHTML === '' && !el.className.includes('show'), 'overlay harus hilang setelah dismiss');
+  });
+
+  await test('resultHook: setResultHook menerima headline + nama (baris "Terakhir")', async () => {
+    const ctx = freshScannerCtx({ karyawan: [emp('K0001', 'Reza Kurnia')] });
+    const seen = [];
+    ctx.__Scanner.setResultHook((item) => seen.push(item));
+    await startAndScan(ctx, 'K0001');
+    assert(seen.length === 1, 'hook harus dipanggil 1x');
+    assert(seen[0].headline === 'ABSENSI MASUK', 'headline hook harus ABSENSI MASUK');
+    assert(seen[0].name === 'Reza Kurnia', 'nama hook harus Reza Kurnia');
   });
 
   await test('bunyi: default ON, bisa dimatikan + tersimpan', async () => {
@@ -616,7 +707,7 @@ async function main() {
     assert(row && !row.classList.contains('riwayat-new'), 'tanpa tambahan tidak boleh sorot');
   });
 
-  console.log('== kiosk.js — Mode Kiosk-lite ==');
+  console.log('== kiosk.js — Mode Kiosk-lite (kamera dulu, baru fullscreen) ==');
 
   await test('kiosk: toggle sembunyikan menu + fullscreen, tersimpan', async () => {
     const doc = makeDocument();
@@ -652,6 +743,95 @@ async function main() {
     sandbox.__Kiosk.init();
     assert(doc.body.classList.contains('kiosk-lite'), 'init harus terapkan CSS tersimpan');
     assert(doc.documentElement.requestFullscreenCalls === 0, 'init tidak boleh minta fullscreen (butuh gesture)');
+  });
+
+  await test('kiosk: enable() jalankan kamera DULU baru fullscreen', async () => {
+    const doc = makeDocument();
+    const localStorage = makeLocalStorage();
+    const order = [];
+    const scannerStub = {
+      active: false,
+      startCalls: 0, stopCalls: 0,
+      isActive() { return this.active; },
+      async start() { this.startCalls += 1; order.push('camera'); this.active = true; },
+      async stop() { this.stopCalls += 1; this.active = false; },
+    };
+    const origRequest = doc.documentElement.requestFullscreen;
+    doc.documentElement.requestFullscreen = () => {
+      order.push('fullscreen');
+      return origRequest();
+    };
+    const sandbox = { console, document: doc, localStorage, Scanner: scannerStub };
+    vm.createContext(sandbox);
+    vm.runInContext(read('js/kiosk.js'), sandbox, { filename: 'kiosk.js' });
+    vm.runInContext('globalThis.__Kiosk = Kiosk;', sandbox);
+    await sandbox.__Kiosk.enable();
+    assert(scannerStub.startCalls === 1, 'kamera harus dijalankan dulu');
+    assert(doc.documentElement.requestFullscreenCalls === 1, 'fullscreen harus diminta setelah kamera');
+    assert(order[0] === 'camera' && order[1] === 'fullscreen',
+      'urutan harus kamera -> fullscreen, dapat ' + order.join(' -> '));
+  });
+
+  await test('kiosk: enable() tidak restart kamera bila sudah jalan', async () => {
+    const doc = makeDocument();
+    const localStorage = makeLocalStorage();
+    const scannerStub = {
+      active: true,
+      startCalls: 0, stopCalls: 0,
+      isActive() { return this.active; },
+      async start() { this.startCalls += 1; this.active = true; },
+      async stop() { this.stopCalls += 1; this.active = false; },
+    };
+    const sandbox = { console, document: doc, localStorage, Scanner: scannerStub };
+    vm.createContext(sandbox);
+    vm.runInContext(read('js/kiosk.js'), sandbox, { filename: 'kiosk.js' });
+    vm.runInContext('globalThis.__Kiosk = Kiosk;', sandbox);
+    await sandbox.__Kiosk.enable();
+    assert(scannerStub.startCalls === 0, 'kamera yang sudah jalan tidak boleh di-start ulang');
+    assert(doc.documentElement.requestFullscreenCalls === 1, 'fullscreen tetap diminta');
+  });
+
+  await test('kiosk: fullscreenchange restart scanner (video/qrbox dihitung ulang)', async () => {
+    const doc = makeDocument();
+    const localStorage = makeLocalStorage();
+    const scannerStub = {
+      active: true,
+      startCalls: 0, stopCalls: 0,
+      isActive() { return this.active; },
+      async start() { this.startCalls += 1; this.active = true; },
+      async stop() { this.stopCalls += 1; this.active = false; },
+    };
+    const sandbox = { console, document: doc, localStorage, Scanner: scannerStub };
+    vm.createContext(sandbox);
+    vm.runInContext(read('js/kiosk.js'), sandbox, { filename: 'kiosk.js' });
+    vm.runInContext('globalThis.__Kiosk = Kiosk;', sandbox);
+    sandbox.__Kiosk.init();
+    doc._fire('fullscreenchange');
+    await new Promise((r) => setTimeout(r, 10));
+    assert(scannerStub.stopCalls === 1, 'scanner harus di-stop saat fullscreenchange');
+    assert(scannerStub.startCalls === 1, 'scanner harus di-start lagi setelah stop');
+    assert(scannerStub.active === true, 'scanner harus aktif lagi setelah restart');
+  });
+
+  await test('kiosk: fullscreenchange tidak restart bila scanner mati', async () => {
+    const doc = makeDocument();
+    const localStorage = makeLocalStorage();
+    const scannerStub = {
+      active: false,
+      startCalls: 0, stopCalls: 0,
+      isActive() { return this.active; },
+      async start() { this.startCalls += 1; this.active = true; },
+      async stop() { this.stopCalls += 1; this.active = false; },
+    };
+    const sandbox = { console, document: doc, localStorage, Scanner: scannerStub };
+    vm.createContext(sandbox);
+    vm.runInContext(read('js/kiosk.js'), sandbox, { filename: 'kiosk.js' });
+    vm.runInContext('globalThis.__Kiosk = Kiosk;', sandbox);
+    sandbox.__Kiosk.init();
+    doc._fire('fullscreenchange');
+    await new Promise((r) => setTimeout(r, 10));
+    assert(scannerStub.stopCalls === 0 && scannerStub.startCalls === 0,
+      'scanner mati tidak boleh di-restart');
   });
 
   console.log('\n' + passed + ' lulus, ' + failed + ' gagal');

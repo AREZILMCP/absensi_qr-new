@@ -5,10 +5,10 @@ const Scanner = (() => {
      [1] KONSTANTA & STATE
      ------------------------------------------------------------ */
   const COOLDOWN_MS = 2000;
-  // Durasi overlay hasil scan per tipe (ms) — plan UX §3.1.
-  // Sukses singkat (antrean jalan terus), peringatan lebih lama,
-  // gagal paling lama supaya alasannya sempat dibaca.
-  const RESULT_TIMEOUTS = { ok: 3000, warn: 4000, err: 5000 };
+  // Durasi overlay hasil scan: 1 detik untuk SEMUA tipe (model
+  // gate — antrean panjang, sinyal warna sekejap). Scan berikutnya
+  // langsung menggantikan overlay yang tampil (tanpa antrean).
+  const RESULT_TIMEOUT_MS = 1000;
 
   const TARGET_ID = 'reader';
   const RESULT_ID = 'resultScan';
@@ -24,34 +24,30 @@ const Scanner = (() => {
   let lastScan = { text: null, time: 0 };
   let resultTimer = null;
 
-  // Overlay hasil scan (plan UX §3.4 — antrean): hanya satu overlay
-  // yang tampil; scan berikutnya masuk antrean (maks. 1 slot, yang
-  // terbaru menggantikan yang lama) dan ditampilkan setelah overlay
-  // sekarang selesai. waitingCount = jumlah scan yang masuk saat
-  // overlay tampil (dipakai badge "n scan menunggu").
-  let overlayBusy = false;
-  let queuedResult = null;
-  let waitingCount = 0;
+  // Overlay hasil scan (model gate): satu overlay tampil; scan
+  // berikutnya langsung menggantikannya (tanpa antrean).
   let closeBound = false;
+  let resultHook = null;
 
   let soundEnabled = true;
   try { soundEnabled = localStorage.getItem(SOUND_KEY) !== '0'; } catch { /* abaikan */ }
   let audioCtx = null;
 
-  // Mode scan: 'presensi' (alur 1-4) atau 'kantin' (tebus kupon terbit).
-  // Default presensi; diganti lewat tombol mode di hero dashboard.
+  // Mode scan: 'presensi' (pintu masuk) atau 'kantin' (ruang makan).
+  // Default presensi; diganti lewat tombol mode di hero dashboard,
+  // atau dikunci lewat URL di halaman scan (scan.html?mode=kantin).
   let mode = 'presensi';
 
   const MODE_TEXT = {
     presensi: {
-      title: 'Scan QR Karyawan',
-      desc: 'Scan pertama mencatat <strong>absensi</strong>, scan berikutnya mencatat pengambilan <strong>kupon makan</strong>.',
-      hint: 'Scan 1 masuk · Scan 2 kupon makan · Scan 3 pulang · Scan 4 kupon lembur',
+      title: 'Scan QR Karyawan — Presensi',
+      desc: 'Pagi check-in (maks 08:15) &middot; 16:00 check-out &middot; lewat 16:00 lembur.',
+      hint: 'Pagi check-in (maks 08:15) · 12:00 makan siang · 16:00 check-out · >16:00 lembur',
     },
     kantin: {
-      title: 'Scan Kantin — Tebus Kupon',
-      desc: 'Scan QR karyawan untuk menebus kupon makan yang sudah <strong>terbit</strong> hari ini. Satu kupon hanya berlaku 1×.',
-      hint: 'Kupon terbit di scan presensi ke-2 (reguler) atau ke-4 (lembur) · tanpa kupon aktif, scan ditolak',
+      title: 'Scan Kantin — Makan',
+      desc: '12:00&ndash;13:00 makan siang &middot; &ge;18:00 ekstra makan (lembur &ge; 2 jam). Kupon otomatis terbit.',
+      hint: 'Makan siang 12:00–13:00 · ekstra makan ≥18:00 (lembur ≥ 2 jam) · sekali scan langsung ambil makan',
     },
   };
 
@@ -125,15 +121,6 @@ const Scanner = (() => {
      [3] HELPER — deteksi tanggal lokal (YYYY-MM-DD, tanpa UTC)
      ------------------------------------------------------------ */
   function todayLocalISO() { return Utils.todayLocalISO(); }
-
-  function hasManualToday(karyawanId) {
-    if (!karyawanId) return false;
-    const today = todayLocalISO();
-    return Storage.getReservasiManual().some((r) => {
-      if (r.karyawanId !== karyawanId) return false;
-      return Utils.toLocalISODate(r.tanggal || r.createdAt) === today;
-    });
-  }
 
   /* ------------------------------------------------------------
      [4.a] SCAN VIA SERVER (Fase 2) — validasi jam & state di server
@@ -221,8 +208,86 @@ const Scanner = (() => {
   }
 
   /* ------------------------------------------------------------
-     [4] HANDLE SCAN — inti logika absensi & kupon
+     [4] HANDLE SCAN — model DINAMIS berbasis jam (17 Nov 2026)
+     Jam yang menentukan arti sebuah scan, bukan hitungan scan
+     ke berapa (alur 1-2-3-4 dihapus). Aturan lengkap di decideScan();
+     api.php?action=scan mencerminkan aturan yang sama.
      ------------------------------------------------------------ */
+
+  // Keputusan scan murni (tanpa efek samping) — bisa diuji Node.
+  // nowMin: menit sejak 00:00 (Utils.menitHariIni()).
+  // st: { absenToday, pulangToday, makanSiangToday,
+  //       ekstraMakanToday, pulangMenit }
+  // Kembali: { type, aksi, message, lemburMenit }.
+  // aksi: 'masuk' | 'pulang' | 'makan-siang' | 'ekstra-makan' | 'tolak'.
+  function decideScan(mode, nowMin, st) {
+    const W = (typeof Utils !== 'undefined' && Utils.WORK) || {};
+    const MASUK_MAX = menitDariJamStr(W.MASUK || '08:00');
+    const TOLERANSI = W.TOLERANSI_TERLAMBAT_MENIT != null ? W.TOLERANSI_TERLAMBAT_MENIT : 15;
+    const MAKAN_MULAI = menitDariJamStr(W.MAKAN_MULAI || '12:00');
+    const MAKAN_AKHIR = menitDariJamStr(W.MAKAN_AKHIR || '13:00');
+    const PULANG = menitDariJamStr(W.PULANG || '16:00');
+    const LEMBUR_MAKAN = W.LEMBUR_SETELAH_MENIT != null ? W.LEMBUR_SETELAH_MENIT : 120;
+
+    if (mode === 'kantin') {
+      const jamMakan = nowMin >= MAKAN_MULAI && nowMin <= MAKAN_AKHIR;
+      const jamEkstra = nowMin >= PULANG + LEMBUR_MAKAN; // >= 18:00
+      if (!jamMakan && !jamEkstra) {
+        return { type: 'warn', aksi: 'tolak', message: 'Di luar jam makan — makan siang 12:00–13:00, ekstra makan ≥18:00', lemburMenit: 0 };
+      }
+      if (!st.absenToday) {
+        return { type: 'warn', aksi: 'tolak', message: 'Belum absen masuk — makan butuh absensi masuk hari ini', lemburMenit: 0 };
+      }
+      if (jamMakan) {
+        if (st.makanSiangToday) {
+          return { type: 'warn', aksi: 'tolak', message: 'Sudah ambil makan siang hari ini', lemburMenit: 0 };
+        }
+        return { type: 'ok', aksi: 'makan-siang', message: 'Makan siang berhasil — kupon otomatis terbit, silakan ambil makanan', lemburMenit: 0 };
+      }
+      // jamEkstra (>= 18:00)
+      const lemburMenit = st.pulangToday && st.pulangMenit != null ? Math.max(0, st.pulangMenit - PULANG) : 0;
+      if (!st.pulangToday || lemburMenit < LEMBUR_MAKAN) {
+        return { type: 'warn', aksi: 'tolak', message: 'Belum 2 jam lembur — ekstra makan setelah lembur 2 jam (≥18:00)', lemburMenit };
+      }
+      if (st.ekstraMakanToday) {
+        return { type: 'warn', aksi: 'tolak', message: 'Sudah ambil ekstra makan hari ini', lemburMenit };
+      }
+      return { type: 'ok', aksi: 'ekstra-makan', message: 'Ekstra makan berhasil — kupon lembur otomatis terbit, silakan ambil makanan', lemburMenit };
+    }
+
+    // --- MODE PRESENSI ---
+    if (nowMin < PULANG) {
+      if (!st.absenToday) {
+        if (nowMin > MASUK_MAX + TOLERANSI) {
+          return { type: 'err', aksi: 'tolak', message: 'Check-in ditutup — terlambat melewati 08:15', lemburMenit: 0 };
+        }
+        return { type: 'ok', aksi: 'masuk', message: 'Absensi masuk berhasil dicatat', lemburMenit: 0 };
+      }
+      return { type: 'warn', aksi: 'tolak', message: 'Belum jam pulang — check-out mulai 16:00', lemburMenit: 0 };
+    }
+    // nowMin >= 16:00
+    if (!st.absenToday) {
+      return { type: 'warn', aksi: 'tolak', message: 'Belum absen masuk hari ini', lemburMenit: 0 };
+    }
+    if (st.pulangToday) {
+      return { type: 'warn', aksi: 'tolak', message: 'Sudah absen pulang hari ini', lemburMenit: 0 };
+    }
+    const lemburMenit = nowMin - PULANG;
+    return {
+      type: 'ok',
+      aksi: 'pulang',
+      message: lemburMenit > 0
+        ? 'Absensi pulang dicatat — Lembur ' + Utils.formatDurasi(lemburMenit)
+        : 'Absensi pulang berhasil dicatat',
+      lemburMenit,
+    };
+  }
+
+  function menitDariJamStr(s) {
+    const p = String(s || '00:00').split(':');
+    return (parseInt(p[0], 10) || 0) * 60 + (parseInt(p[1], 10) || 0);
+  }
+
   async function handleScan(text) {
     if (!isScanning) return;
 
@@ -266,148 +331,87 @@ const Scanner = (() => {
     if (archived) Storage.save();
 
     const nowIso = Utils.nowIso();
+    const nowMin = Utils.menitHariIni();
     const absenToday = Utils.isToday(karyawan.absenAt);
-    const makanToday = Utils.isToday(karyawan.makanAt);
     const pulangToday = Utils.isToday(karyawan.pulangAt);
-    const manualToday = hasManualToday(karyawan.id);
-    const kuponToday = makanToday || manualToday;
-
-    // --- MODE KANTIN: tebus kupon yang sudah terbit (B7) ---
-    if (mode === 'kantin') {
-      handleKantin(karyawan, nowIso, makanToday);
+    let pulangMenit = null;
+    if (pulangToday && karyawan.pulangAt) {
+      const dp = new Date(karyawan.pulangAt);
+      if (!Number.isNaN(dp.getTime())) pulangMenit = dp.getHours() * 60 + dp.getMinutes();
     }
-    // --- STATE 1: belum absen hari ini → catat ABSENSI MASUK ---
-    else if (!absenToday) {
+    const jenis = (karyawan.kuponJenis || 'reguler') === 'lembur' ? 'lembur' : 'reguler';
+    const makanSiangToday = Utils.isToday(karyawan.makanAt) && jenis === 'reguler' && karyawan.kuponStatus === 'ditebus';
+    const ekstraMakanToday = Utils.isToday(karyawan.makanAt) && jenis === 'lembur' && karyawan.kuponStatus === 'ditebus';
+
+    const d = decideScan(mode, nowMin, { absenToday, pulangToday, makanSiangToday, ekstraMakanToday, pulangMenit });
+
+    if (d.aksi === 'tolak') {
+      showEmployee(karyawan, d.type, d.message);
+      refreshAfterScan();
+      return;
+    }
+
+    if (d.aksi === 'masuk') {
       karyawan.absen = true;
       karyawan.absenAt = nowIso;
       delete karyawan.pulangAt;
       Storage.addRiwayat(karyawan.nama, 'Absensi');
       Storage.catatPresensiMasuk(karyawan, nowIso);
       Storage.save();
-      showEmployee(karyawan, 'ok', 'Absensi masuk berhasil dicatat');
-    }
-    // --- STATE 2: belum punya kupon hari ini → TERBITKAN KUPON MAKAN ---
-    else if (!kuponToday) {
+      showEmployee(karyawan, 'ok', d.message);
+    } else if (d.aksi === 'pulang') {
+      karyawan.pulangAt = nowIso;
+      Storage.addRiwayat(karyawan.nama, 'Absensi Pulang');
+      Storage.catatPresensiPulang(karyawan, nowIso, d.lemburMenit > 0);
+      Storage.save();
+      showEmployee(karyawan, 'ok', d.message);
+    } else if (d.aksi === 'makan-siang' || d.aksi === 'ekstra-makan') {
+      const isEkstra = d.aksi === 'ekstra-makan';
+      if (isEkstra) {
+        // Arsipkan kupon makan siang sebelum diganti kupon lembur.
+        Storage.archiveKupon(karyawan, 'Makan siang (diganti kupon lembur)');
+      }
       karyawan.makan = true;
       karyawan.makanAt = nowIso;
       karyawan.kuponKode = Utils.nextKodeTransaksi();
       karyawan.kuponReleased = true;
       karyawan.kuponReleasedAt = nowIso;
-      karyawan.kuponStatus = 'terbit';
-      karyawan.kuponJenis = pulangToday ? 'lembur' : 'reguler';
-      delete karyawan.kuponDitebusAt;
-      Storage.addRiwayat(karyawan.nama, 'Kupon Makan');
+      karyawan.kuponStatus = 'ditebus';
+      karyawan.kuponJenis = isEkstra ? 'lembur' : 'reguler';
+      karyawan.kuponDitebusAt = nowIso;
+      Storage.addRiwayat(karyawan.nama, isEkstra ? 'Ekstra Makan' : 'Makan Siang');
       Storage.save();
-      showEmployee(
-        karyawan,
-        'ok',
-        pulangToday
-          ? 'Kupon Makan lembur (tambahan) berhasil diterbitkan — tebus di kantin'
-          : 'Kupon Makan berhasil diterbitkan — tebus di kantin'
-      );
-    }
-    // --- STATE 3: sudah absen & punya kupon, belum pulang ---
-    else if (!pulangToday) {
-      if (!Utils.isSudahJamPulang()) {
-        showEmployee(
-          karyawan,
-          'warn',
-          makanToday
-            ? `Sudah absen & kupon makan sudah terbit. Absen pulang mulai ${Utils.formatJamPulang()}`
-            : 'Kupon makan hari ini sudah tercatat via reservasi manual'
-        );
-        return;
-      }
-
-      // Catat ABSENSI PULANG
-      karyawan.pulangAt = nowIso;
-      Storage.addRiwayat(karyawan.nama, 'Absensi Pulang');
-
-      let msg = 'Absensi pulang berhasil dicatat';
-      if (Utils.isLembur()) {
-        const direset = Storage.autoResetLembur(karyawan);
-        if (direset) {
-          Storage.addRiwayat(karyawan.nama, 'Lembur - Kupon Direset');
-          msg = 'Absensi pulang dicatat — LEMBUR: kupon makan direset, 1× kupon tambahan tersedia';
-        } else {
-          msg = 'Absensi pulang dicatat (lembur hari ini sudah pernah direset)';
-        }
-      }
-      Storage.catatPresensiPulang(karyawan, nowIso, Utils.isLembur());
-      Storage.save();
-      showEmployee(karyawan, 'ok', msg);
-    }
-    // --- STATE 4: sudah absen pulang ---
-    else {
-      showEmployee(
-        karyawan,
-        'warn',
-        karyawan.kuponStatus === 'ditebus'
-          ? 'Sudah absen pulang & kupon makan hari ini sudah ditebus'
-          : 'Sudah absen pulang — kupon makan masih bisa ditebus di kantin'
-      );
+      showEmployee(karyawan, 'ok', d.message);
     }
 
     refreshAfterScan();
   }
 
   /* ------------------------------------------------------------
-     [4.b] MODE KANTIN — tebus kupon terbit (B7)
-     Kupon dari reservasi manual TIDAK ditebus di sini; jalurnya
-     tetap lewat menu Release Reservasi.
-     ------------------------------------------------------------ */
-  function handleKantin(karyawan, nowIso, makanToday) {
-    if (!makanToday) {
-      showEmployee(
-        karyawan,
-        'warn',
-        'Tidak ada kupon makan aktif hari ini — kupon belum diterbitkan (scan presensi dulu)'
-      );
-      return;
-    }
-    if (karyawan.kuponStatus === 'ditebus') {
-      const d = new Date(karyawan.kuponDitebusAt);
-      const jam = Number.isNaN(d.getTime())
-        ? ''
-        : ` pukul ${d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`;
-      showEmployee(
-        karyawan,
-        'warn',
-        `Kupon makan sudah ditebus${jam} — 1 kupon hanya berlaku 1×`
-      );
-      return;
-    }
-    const jenis = karyawan.kuponJenis === 'lembur' ? 'lembur' : 'reguler';
-    karyawan.kuponStatus = 'ditebus';
-    karyawan.kuponDitebusAt = nowIso;
-    Storage.addRiwayat(karyawan.nama, 'Tebus Kupon');
-    Storage.save();
-    showEmployee(karyawan, 'ok', `Kupon makan ${jenis} berhasil ditebus di kantin`);
-  }
-
-  /* ------------------------------------------------------------
      [5] TAMPILAN HASIL — overlay memenuhi hero (plan UX §3)
      showSimple/showEmployee HANYA membangun isi hasil, lalu
-     displayResult() yang memutuskan: tampil sekarang atau antre.
-     Logika scan (state 1-4, kantin, validasi) TIDAK diubah di sini.
+     displayResult() menampilkannya langsung (tanpa antrean).
+     Semua tipe auto-hilang 1 detik; scan baru menggantikan.
      ------------------------------------------------------------ */
 
   // Judul besar dari pesan hasil — satu pesan dominan per overlay.
+  // Urutan penting: penolakan dicek dulu.
   function headlineFor(message, type) {
     const m = String(message || '');
-    // Urutan penting: penolakan dicek dulu — pesan "kupon belum
-    // diterbitkan" mengandung kata "diterbitkan" dan akan salah
-    // tertangkap pola KUPON TERBIT kalau dicek belakangan.
     if (/Karyawan Non-Aktif/i.test(m)) return 'DITOLAK';
     if (/QR tidak dikenali/i.test(m)) return 'QR TIDAK DIKENALI';
-    if (/Tidak ada kupon/i.test(m)) return 'TIDAK ADA KUPON';
-    if (/Kupon makan sudah ditebus/i.test(m)) return 'SUDAH DITEBUS';
-    if (/Kupon makan .* berhasil ditebus/i.test(m)) return 'KUPON DITEBUS';
-    if (/Kupon Makan lembur .* diterbitkan/i.test(m)) return 'KUPON LEMBUR TERBIT';
-    if (/Kupon Makan .* diterbitkan/i.test(m)) return 'KUPON MAKAN TERBIT';
+    if (/Check-in ditutup/i.test(m)) return 'DITOLAK';
+    if (/Belum jam pulang/i.test(m)) return 'BELUM JAM PULANG';
+    if (/Belum absen masuk/i.test(m)) return 'BELUM ABSEN MASUK';
+    if (/Sudah absen pulang/i.test(m)) return 'SUDAH PULANG';
+    if (/Di luar jam makan/i.test(m)) return 'DI LUAR JAM MAKAN';
+    if (/Sudah ambil makan siang/i.test(m)) return 'SUDAH AMBIL MAKAN';
+    if (/Sudah ambil ekstra makan/i.test(m)) return 'SUDAH EKSTRA MAKAN';
+    if (/Belum 2 jam lembur/i.test(m)) return 'BELUM 2 JAM LEMBUR';
+    if (/Ekstra makan berhasil/i.test(m)) return 'EKSTRA MAKAN';
+    if (/Makan siang berhasil/i.test(m)) return 'MAKAN SIANG';
     if (/Absensi pulang/i.test(m)) return 'ABSENSI PULANG';
     if (/Absensi masuk/i.test(m)) return 'ABSENSI MASUK';
-    if (/Sudah absen/i.test(m)) return 'SUDAH TERCATAT';
     if (/Gagal mengakses kamera|Library scanner/i.test(m)) return 'KAMERA BERMASALAH';
     return type === 'ok' ? 'BERHASIL' : type === 'warn' ? 'PERHATIAN' : 'GAGAL';
   }
@@ -423,19 +427,26 @@ const Scanner = (() => {
         return 'Masuk ' + jam + ' • ' + (telat > 0 ? 'Terlambat ' + telat + ' menit' : 'Tepat waktu');
       }
     }
+    if (headline === 'ABSENSI PULANG' && k.pulangAt) {
+      const d = new Date(k.pulangAt);
+      if (!Number.isNaN(d.getTime())) {
+        const lemburMenit = Math.max(0, d.getHours() * 60 + d.getMinutes() - 16 * 60);
+        return lemburMenit > 0
+          ? 'Pulang ' + jam + ' • Lembur ' + Utils.formatDurasi(lemburMenit)
+          : 'Pulang ' + jam;
+      }
+    }
     if (headline === 'ABSENSI PULANG') {
-      return /LEMBUR/.test(message)
-        ? 'Pulang ' + jam + ' • Lembur — kupon reguler direset'
-        : 'Pulang ' + jam;
+      return 'Pulang ' + jam;
     }
     return jam;
   }
 
-  // Kode kupon ditampilkan besar hanya saat kupon terbit/ditebus.
-  // (Sebelumnya kuponKode diisi di state 2 tapi tidak pernah tampil.)
+  // Kode kupon ditampilkan besar hanya saat makan siang / ekstra
+  // makan (kupon otomatis terbit + ditebus dalam satu scan).
   function kuponCodeFor(k, headline) {
     if (!k.kuponKode) return '';
-    if (headline !== 'KUPON MAKAN TERBIT' && headline !== 'KUPON LEMBUR TERBIT' && headline !== 'KUPON DITEBUS') return '';
+    if (headline !== 'MAKAN SIANG' && headline !== 'EKSTRA MAKAN') return '';
     return k.kuponKode;
   }
 
@@ -452,9 +463,7 @@ const Scanner = (() => {
     const kodeHtml = kode
       ? `<div class="scan-overlay-kupon"><span class="scan-overlay-kupon-lbl">Kode kupon</span><span class="scan-overlay-kupon-kode">${escapeHtml(kode)}</span></div>`
       : '';
-    const noteHtml = (headline === 'KUPON MAKAN TERBIT' || headline === 'KUPON LEMBUR TERBIT')
-      ? '<div class="scan-overlay-note">Tebus di kantin — 1 kupon hanya berlaku 1×</div>'
-      : '';
+    const detail = detailFor(k, headline, message, timeStr);
     const html = `
       <div class="scan-overlay-inner scan-overlay-${type}">
         <div class="scan-overlay-icon" aria-hidden="true">${icon}</div>
@@ -462,14 +471,13 @@ const Scanner = (() => {
           <div class="scan-overlay-headline">${escapeHtml(headline)}</div>
           <div class="scan-overlay-name">${escapeHtml(k.nama)}</div>
           <div class="scan-overlay-meta"><span>${escapeHtml(k.id)}</span><span class="scan-meta-dot">•</span><span>${escapeHtml(k.kategori || '-')}</span></div>
-          <div class="scan-overlay-detail">${escapeHtml(detailFor(k, headline, message, timeStr))}</div>
-          ${kodeHtml}${noteHtml}
+          <div class="scan-overlay-detail">${escapeHtml(detail)}</div>
+          ${kodeHtml}
         </div>
         <div class="scan-overlay-photo">${photoHtmlFor(k)}</div>
         <button type="button" class="scan-overlay-close" aria-label="Tutup hasil scan">✕</button>
-        <div class="scan-overlay-waiting" hidden></div>
       </div>`;
-    return { html, type };
+    return { html, type, headline, name: k.nama, detail, kode };
   }
 
   function buildSimpleItem(msg, type) {
@@ -483,9 +491,8 @@ const Scanner = (() => {
           <div class="scan-overlay-detail">${escapeHtml(msg)}</div>
         </div>
         <button type="button" class="scan-overlay-close" aria-label="Tutup hasil scan">✕</button>
-        <div class="scan-overlay-waiting" hidden></div>
       </div>`;
-    return { html, type };
+    return { html, type, headline, message: msg };
   }
 
   // Bunyi beep via Web Audio (tanpa file eksternal). Gagal diam-diam:
@@ -522,53 +529,6 @@ const Scanner = (() => {
     try { localStorage.setItem(SOUND_KEY, soundEnabled ? '1' : '0'); } catch { /* abaikan */ }
   }
 
-  // Badge "n scan menunggu" pada overlay yang sedang tampil.
-  function updateWaitingBadge() {
-    const el = document.getElementById(RESULT_ID);
-    if (!el) return;
-    const badge = el.querySelector('.scan-overlay-waiting');
-    if (!badge) return;
-    if (waitingCount > 0) {
-      badge.hidden = false;
-      badge.textContent = '+' + waitingCount + ' scan menunggu';
-    } else {
-      badge.hidden = true;
-      badge.textContent = '';
-    }
-  }
-
-  function displayResult(item) {
-    if (overlayBusy) {
-      // Antrean maks. 1 slot: yang terbaru menggantikan yang lama.
-      queuedResult = item;
-      waitingCount += 1;
-      updateWaitingBadge();
-      return;
-    }
-    showOverlay(item);
-  }
-
-  function showOverlay(item) {
-    const el = document.getElementById(RESULT_ID);
-    if (!el) return;
-    bindCloseOnce(el);
-    overlayBusy = true;
-    el.innerHTML = item.html;
-    el.className = 'result show scan-overlay scan-overlay-' + item.type;
-    updateWaitingBadge();
-    beep(item.type);
-    if (resultTimer) clearTimeout(resultTimer);
-    resultTimer = setTimeout(clearResult, RESULT_TIMEOUTS[item.type] || 3000);
-  }
-
-  // Tutup overlay lebih awal (tombol ✕ untuk admin). Kalau ada antrean,
-  // hasil berikutnya langsung tampil.
-  function dismissResult() {
-    if (resultTimer) clearTimeout(resultTimer);
-    resultTimer = null;
-    clearResult();
-  }
-
   function bindCloseOnce(el) {
     if (closeBound) return;
     closeBound = true;
@@ -579,32 +539,47 @@ const Scanner = (() => {
     });
   }
 
+  function displayResult(item) {
+    // Tanpa antrean: hasil baru langsung menggantikan yang tampil.
+    showOverlay(item);
+  }
+
+  function showOverlay(item) {
+    const el = document.getElementById(RESULT_ID);
+    if (!el) return;
+    bindCloseOnce(el);
+    el.innerHTML = item.html;
+    el.className = 'result show scan-overlay scan-overlay-' + item.type;
+    beep(item.type);
+    if (resultHook) {
+      try { resultHook(item); } catch { /* abaikan */ }
+    }
+    if (resultTimer) clearTimeout(resultTimer);
+    resultTimer = setTimeout(clearResult, RESULT_TIMEOUT_MS);
+  }
+
+  // Tutup overlay lebih awal (tombol ✕ untuk admin).
+  function dismissResult() {
+    if (resultTimer) clearTimeout(resultTimer);
+    resultTimer = null;
+    clearResult();
+  }
+
+  function clearResult() {
+    const el = document.getElementById(RESULT_ID);
+    resultTimer = null;
+    if (el) {
+      el.className = 'result scan-overlay';
+      el.innerHTML = '';
+    }
+  }
+
   function showSimple(msg, type) {
     displayResult(buildSimpleItem(msg, type));
   }
 
   function showEmployee(k, type, message, timeStr) {
     displayResult(buildEmployeeItem(k, type, message, timeStr));
-  }
-
-  function clearResult() {
-    const el = document.getElementById(RESULT_ID);
-    resultTimer = null;
-    overlayBusy = false;
-    if (queuedResult) {
-      // Antrean hanya menyimpan 1 slot (yang terbaru); scan yang
-      // tertimpa sudah tercatat datanya, hanya konfirmasi visualnya
-      // yang dilewat — jadi hitungan menunggu di-reset di sini.
-      const next = queuedResult;
-      queuedResult = null;
-      waitingCount = 0;
-      showOverlay(next);
-      return;
-    }
-    if (el) {
-      el.className = 'result scan-overlay';
-      el.innerHTML = '';
-    }
   }
 
   /* ------------------------------------------------------------
@@ -626,6 +601,7 @@ const Scanner = (() => {
     dismissResult,
     setSoundEnabled,
     isSoundEnabled: () => soundEnabled,
-    getWaitingCount: () => waitingCount,
+    // Hook hasil scan (dipakai halaman scan untuk baris "Terakhir").
+    setResultHook: (fn) => { resultHook = typeof fn === 'function' ? fn : null; },
   };
 })();

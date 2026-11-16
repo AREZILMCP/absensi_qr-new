@@ -107,12 +107,21 @@ const Utils = (() => {
 
   /* ------------------------------------------------------------
      [3.c] JAM KERJA — ubah angka di sini bila aturan berubah
-     Atur jam disini untuk otomatis kupon makan lembur
+     Model DINAMIS berbasis jam (17 Nov 2026, ganti hitung scan
+     1-2-3-4): jam yang menentukan apa arti sebuah scan.
+     - Check-in jam 08:00 pas; 08:01-08:15 terlambat (toleransi,
+       tetap tercatat); lewat 08:15 check-in DI-BLOCK.
+     - Makan siang 12:00-13:00 (inklusif) di kantin; ekstra makan
+       bila lembur >= 120 menit (pulang >= 18:00).
+     - Lembur dihitung mulai lewat 16:00 (pulang 17:00 = 1 jam).
      ------------------------------------------------------------ */
   const WORK = {
     MASUK: '08:00',              // jam masuk (non-shift, sesuai artikel B1)
+    TOLERANSI_TERLAMBAT_MENIT: 15, // toleransi keterlambatan -> block setelah 08:15
+    MAKAN_MULAI: '12:00',        // jendela makan siang (inklusif)
+    MAKAN_AKHIR: '13:00',        // jendela makan siang (inklusif)
     PULANG: '16:00',             // jam pulang (non-shift, sesuai artikel B1)
-    LEMBUR_SETELAH_MENIT: 120,   // lembur jika pulang >= PULANG
+    LEMBUR_SETELAH_MENIT: 120,   // ekstra makan bila lembur >= 120 menit
   };
 
   // 'HH:MM' / 'HH:MM:SS' → detik sejak 00:00
@@ -126,15 +135,59 @@ const Utils = (() => {
     return t.getHours() * 3600 + t.getMinutes() * 60 + t.getSeconds();
   }
 
+  // Menit sejak 00:00 ('HH:MM' -> menit). Dipakai semua keputusan
+  // berbasis jam di model dinamis (presisi menit, bukan detik).
+  function menitDariJam(str) {
+    const [h = 0, m = 0] = String(str).split(':').map(Number);
+    return h * 60 + m;
+  }
+
+  // Menit sejak 00:00 pada jam lokal (sim-aware).
+  function menitHariIni(d) {
+    const t = d instanceof Date ? d : now();
+    return t.getHours() * 60 + t.getMinutes();
+  }
+
   function isSudahJamPulang(d) {
     return detikHariIni(d) >= jamKeDetik(WORK.PULANG);
   }
 
+  // Model dinamis: lembur = pulang LEWAT 16:00 (berapa pun; pulang
+  // 17:00 = lembur 1 jam). Dulu: lembur hanya bila pulang > 18:00.
   function isLembur(d) {
-    // B4/B5 artikel: lembur hanya bila pulang SETELAH 18:00;
-    // tepat 18:00 atau lebih awal TIDAK memenuhi syarat.
-    const batas = jamKeDetik(WORK.PULANG) + WORK.LEMBUR_SETELAH_MENIT * 60;
-    return detikHariIni(d) > batas;
+    return detikHariIni(d) > jamKeDetik(WORK.PULANG);
+  }
+
+  // Menit lembur pada jam d (0 bila belum lewat 16:00).
+  function menitLembur(d) {
+    return Math.max(0, Math.floor((detikHariIni(d) - jamKeDetik(WORK.PULANG)) / 60));
+  }
+
+  // Berhak ekstra makan: lembur sudah >= 120 menit (pulang >= 18:00).
+  function isLemburMakan(d) {
+    return menitLembur(d) >= WORK.LEMBUR_SETELAH_MENIT;
+  }
+
+  // Check-in: terlambat bila lewat 08:00 tapi masih dalam toleransi.
+  function isTerlambatMasuk(d) {
+    const m = menitHariIni(d);
+    return m > menitDariJam(WORK.MASUK) && m <= menitDariJam(WORK.MASUK) + WORK.TOLERANSI_TERLAMBAT_MENIT;
+  }
+
+  // Check-in: DI-BLOCK bila lewat 08:15.
+  function isBlockMasuk(d) {
+    return menitHariIni(d) > menitDariJam(WORK.MASUK) + WORK.TOLERANSI_TERLAMBAT_MENIT;
+  }
+
+  // Jendela makan siang 12:00-13:00 (inklusif, presisi menit).
+  function isJamMakan(d) {
+    const m = menitHariIni(d);
+    return m >= menitDariJam(WORK.MAKAN_MULAI) && m <= menitDariJam(WORK.MAKAN_AKHIR);
+  }
+
+  // Jendela ekstra makan: mulai 18:00 (lembur >= 120 menit).
+  function isJamEkstraMakan(d) {
+    return menitLembur(d) >= WORK.LEMBUR_SETELAH_MENIT;
   }
 
   function formatJamPulang() {
@@ -144,10 +197,10 @@ const Utils = (() => {
   /* ------------------------------------------------------------
      [3.e] KALKULATOR LEMBUR - cuma ngitung, tidak mengubah data.
      Dipakai panel simulasi untuk menjawab "kalau pulang jam X
-     gimana?" tanpa scan ulang. Aturan dari artikel B3-B5:
+     gimana?" tanpa scan ulang. Model dinamis (17 Nov 2026):
      - pulang >= 16:00 baru boleh pulang
-     - lembur dihitung setelah 16:00
-     - kupon lembur HANYA bila pulang SETELAH 18:00 (tepat 18:00 tidak)
+     - lembur dihitung mulai lewat 16:00 (pulang 17:00 = 1 jam)
+     - ekstra makan HANYA bila lembur >= 120 menit (pulang >= 18:00)
      ------------------------------------------------------------ */
   function formatDurasi(menit) {
     const m = Math.round(menit);
@@ -171,17 +224,17 @@ const Utils = (() => {
     const totalMenit = (pulang - masuk) / 60;
     const lemburMenit = Math.max(0, (pulang - jamPulang) / 60);
     const bolehPulang = pulang >= jamPulang;
-    const kuponLembur = pulang > batasLembur;
-    const kuponLemburMenit = kuponLembur ? (pulang - batasLembur) / 60 : 0;
+    const kuponLembur = lemburMenit >= WORK.LEMBUR_SETELAH_MENIT;
+    const kuponLemburMenit = kuponLembur ? lemburMenit : 0;
     let alasan;
     if (!bolehPulang) {
       alasan = 'Belum boleh pulang: pulang mulai ' + formatJamPulang() + '.';
     } else if (kuponLembur) {
-      alasan = 'Pulang setelah 18:00, jadi dapat kupon lembur (B4).';
-    } else if (pulang === batasLembur) {
-      alasan = 'Pulang tepat 18:00, belum lembur untuk kupon (B5).';
+      alasan = 'Lembur ' + formatDurasi(lemburMenit) + ' (>= 2 jam), jadi dapat ekstra makan di kantin.';
+    } else if (lemburMenit > 0) {
+      alasan = 'Lembur ' + formatDurasi(lemburMenit) + ' tercatat, tapi ekstra makan baru setelah lembur 2 jam (>= 18:00).';
     } else {
-      alasan = 'Sudah boleh pulang, tapi belum lewat 18:00, jadi belum dapat kupon lembur.';
+      alasan = 'Pulang tepat 16:00, belum ada lembur.';
     }
     return {
       masuk: String(masukStr).slice(0, 5),
@@ -448,8 +501,16 @@ const Utils = (() => {
     updateSortIndicator,
     bindSortHeader,
     WORK,
+    menitDariJam,
+    menitHariIni,
     isSudahJamPulang,
     isLembur,
+    menitLembur,
+    isLemburMakan,
+    isTerlambatMasuk,
+    isBlockMasuk,
+    isJamMakan,
+    isJamEkstraMakan,
     formatJamPulang,
     hitungLembur,
     formatDurasi,

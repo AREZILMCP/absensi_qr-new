@@ -8,7 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
-  <link rel="stylesheet" href="css/style.css?v=highlight1" />
+  <link rel="stylesheet" href="css/style.css?v=scanpage1" />
 </head>
 <body>
 
@@ -198,13 +198,16 @@
               </div>
               <div class="scan-head">
                 <h4 id="scanTitle">Scan QR Karyawan</h4>
-                <p id="scanDesc">Scan pertama mencatat <strong>absensi</strong>, scan berikutnya mencatat pengambilan <strong>kupon makan</strong>.</p>
+                <p id="scanDesc">Jam yang menentukan arti scan: pagi <strong>check-in</strong> (maks 08:15), 16:00 <strong>check-out</strong>, &gt;16:00 <strong>lembur</strong>.</p>
               </div>
               <div class="scan-controls">
                 <button type="button" class="btn btn-success" data-scan-start="qr">Mulai Scan</button>
                 <button type="button" class="btn btn-danger" data-scan-stop>Stop</button>
               </div>
-              <p class="hero-hint" id="heroHint">Scan 1 masuk &middot; Scan 2 kupon makan &middot; Scan 3 pulang &middot; Scan 4 kupon lembur</p>
+              <div class="scan-controls">
+                <button type="button" class="btn btn-primary" id="btnOpenScanPage">Buka Halaman Scan</button>
+              </div>
+              <p class="hero-hint" id="heroHint">Pagi check-in (maks 08:15) &middot; 12:00 makan siang &middot; 16:00 check-out &middot; &gt;16:00 lembur</p>
             </div>
             <div class="result scan-overlay" id="resultScan" role="status" aria-live="polite"></div>
           </div>
@@ -929,12 +932,12 @@
             <p class="sim-desc">Klik jam di bawah untuk melompat ke momen itu, lalu scan QR seperti biasa. Jam berjalan normal dari titik itu, jadi 08:05 akan jadi 08:06 semenit kemudian.</p>
             <div class="sim-presets">
               <button type="button" class="btn btn-sm btn-secondary" data-sim-time="07:55">07:55 &mdash; sebelum masuk</button>
-              <button type="button" class="btn btn-sm btn-primary" data-sim-time="08:05">08:05 &mdash; absen masuk</button>
-              <button type="button" class="btn btn-sm btn-primary" data-sim-time="12:00">12:00 &mdash; kupon makan</button>
+              <button type="button" class="btn btn-sm btn-primary" data-sim-time="08:05">08:05 &mdash; check-in terlambat</button>
+              <button type="button" class="btn btn-sm btn-primary" data-sim-time="12:00">12:00 &mdash; makan siang</button>
               <button type="button" class="btn btn-sm btn-secondary" data-sim-time="15:55">15:55 &mdash; coba pulang (ditolak)</button>
-              <button type="button" class="btn btn-sm btn-primary" data-sim-time="16:05">16:05 &mdash; pulang</button>
-              <button type="button" class="btn btn-sm btn-warning" data-sim-time="18:05">18:05 &mdash; pulang lembur</button>
-              <button type="button" class="btn btn-sm btn-warning" data-sim-time="18:10">18:10 &mdash; kupon lembur</button>
+              <button type="button" class="btn btn-sm btn-primary" data-sim-time="16:05">16:05 &mdash; pulang (lembur 5 mnt)</button>
+              <button type="button" class="btn btn-sm btn-warning" data-sim-time="18:05">18:05 &mdash; pulang (lembur 2 jam)</button>
+              <button type="button" class="btn btn-sm btn-warning" data-sim-time="18:10">18:10 &mdash; ekstra makan</button>
             </div>
             <div class="sim-custom">
               <label for="simCustomTime">Jam lain:</label>

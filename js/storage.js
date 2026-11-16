@@ -292,19 +292,11 @@ const Storage = (() => {
     return Utils.isToday(value);
   }
 
-  function archiveStaleMeal(k) {
-    if (!k || !k.makan || !k.makanAt) return false;
-    if (Utils.isToday(k.makanAt)) return false;
-
-    // Kupon tambahan (sesudah reset lembur di hari yang sama) tetap berstatus lembur
-    const hariMakan = Utils.toLocalISODate(k.makanAt);
-    const kuponTambahan = reservasiArchive.some(
-      (a) =>
-        a.karyawanId === k.id &&
-        String(a.keterangan || '').toLowerCase().includes('lembur') &&
-        Utils.toLocalISODate(a.archivedAt) === hariMakan
-    );
-
+  // Arsipkan kupon yang sedang aktif di karyawan (dipakai siklus
+  // harian & saat kupon reguler diganti kupon lembur di kantin).
+  // Tidak menghapus field karyawan — pemanggil yang membersihkan.
+  function archiveKupon(k, keterangan) {
+    if (!k || (!k.kuponKode && !k.makan)) return false;
     reservasiArchive.push({
       id: 'RV-ARCH-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
       kode: k.kuponKode || '',
@@ -312,15 +304,23 @@ const Storage = (() => {
       nama: k.nama,
       bagian: k.bagian || '',
       tanggal: k.makanAt,
-      lembur: kuponTambahan ? 'Ya' : 'Tidak',
+      lembur: k.kuponJenis === 'lembur' ? 'Ya' : 'Tidak',
       tindakan: 'Ambil',
-      keterangan: 'Siklus harian',
+      keterangan: keterangan || 'Siklus harian',
       released: k.kuponReleased !== false,
       releasedAt: k.kuponReleasedAt || k.makanAt,
       ditebus: k.kuponStatus === 'ditebus' ? 'Ya' : 'Tidak',
       ditebusAt: k.kuponDitebusAt || '',
       archivedAt: Utils.nowIso(),
     });
+    return true;
+  }
+
+  function archiveStaleMeal(k) {
+    if (!k || !k.makan || !k.makanAt) return false;
+    if (Utils.isToday(k.makanAt)) return false;
+
+    archiveKupon(k, 'Siklus harian');
 
     k.makan = false;
     delete k.makanAt;
@@ -445,22 +445,7 @@ const Storage = (() => {
 
     // Kupon dari scan hari ini
     if (k.makan && Utils.isToday(k.makanAt)) {
-      reservasiArchive.push({
-        id: newId(),
-        kode: k.kuponKode || '',
-        karyawanId: k.id,
-        nama: k.nama,
-        bagian: k.bagian || '',
-        tanggal: k.makanAt,
-        lembur: 'Tidak',
-        tindakan: 'Ambil',
-        keterangan: 'Reset otomatis lembur (presensi pulang)',
-        released: k.kuponReleased !== false,
-        releasedAt: k.kuponReleasedAt || k.makanAt,
-        ditebus: k.kuponStatus === 'ditebus' ? 'Ya' : 'Tidak',
-        ditebusAt: k.kuponDitebusAt || '',
-        archivedAt: nowIso,
-      });
+      archiveKupon(k, 'Reset otomatis lembur (presensi pulang)');
       k.makan = false;
       delete k.makanAt;
       delete k.kuponKode;
@@ -584,6 +569,7 @@ const Storage = (() => {
     save: save,
     reset: reset,
     isToday: isToday,
+    archiveKupon: archiveKupon,
     archiveStaleMeal: archiveStaleMeal,
     cleanupStaleMeals: cleanupStaleMeals,
     cleanupStaleReservasiManual: cleanupStaleReservasiManual,
