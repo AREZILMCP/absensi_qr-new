@@ -109,6 +109,9 @@ const Kiosk = (() => {
       restartingScanner = true;
       await Scanner.stop();
       await Scanner.start();
+      // Terapkan lagi ukuran video 100% setelah restart (video baru
+      // dari library kembali membeku pada lebar inline).
+      if (typeof Scanner.fitVideoToHero === 'function') Scanner.fitVideoToHero();
     } catch { /* abaikan: kamera tetap jalan di ukuran lama */ }
     finally { restartingScanner = false; }
   }

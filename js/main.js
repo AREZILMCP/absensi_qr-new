@@ -72,6 +72,30 @@
     document.title = `${text} — Absensi & Kupon Makan QR`;
   }
 
+  // Auto-start kamera dashboard yang ditunda: tunggu layout final
+  // (double requestAnimationFrame + 300ms) supaya #reader sudah
+  // berukuran final saat html5-qrcode membekukan lebar video.
+  // Guard: hanya jalan bila masih di dashboard & scanner belum aktif.
+  let dashStartTimer = null;
+  function scheduleDashboardScanStart() {
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          dashStartTimer = setTimeout(startDashboardScanner, 300);
+        });
+      });
+    } else {
+      dashStartTimer = setTimeout(startDashboardScanner, 300);
+    }
+  }
+  function startDashboardScanner() {
+    dashStartTimer = null;
+    if (typeof Scanner === 'undefined' || !Scanner.start) return;
+    if (typeof Scanner.isActive === 'function' && Scanner.isActive()) return;
+    if (!document.getElementById('panel-dashboard')?.classList.contains('active')) return;
+    Scanner.start().catch(() => {});
+  }
+
   function activateTab(tab) {
     const user = Auth.getUser();
     if (PENGATURAN_TABS.includes(tab) && user?.role !== 'admin') {
@@ -124,10 +148,10 @@
     if (tab === 'dashboard') {
       // Dashboard = layar scan: kamera auto-start saat dashboard
       // terbuka setelah login (NOL aksi). Berhenti saat pindah tab.
-      if (typeof Scanner !== 'undefined' && Scanner.start &&
-          typeof Scanner.isActive === 'function' && !Scanner.isActive()) {
-        Scanner.start().catch(() => {});
-      }
+      // Ditunda sampai layout final settle (double rAF + 300ms):
+      // html5-qrcode membekukan lebar inline <video> dari ukuran
+      // #reader saat start — start terlalu dini = video kecil.
+      scheduleDashboardScanStart();
     } else {
       Scanner.stop();
     }
@@ -203,6 +227,28 @@
     dashClockStarted = true;
     tickDashClock();
     setInterval(tickDashClock, 1000);
+  }
+
+  // Baris "Terakhir" di panel kanan hero: hasil scan terakhir tetap
+  // terlihat setelah overlay gate 1 detik hilang (riwayat ada di bawah).
+  function renderScanLast(item) {
+    const textEl = document.getElementById('scanLastText');
+    if (!textEl || !item) return;
+    let jam = '';
+    try {
+      jam = (typeof Utils !== 'undefined' && Utils.formatJam && Utils.now)
+        ? Utils.formatJam(Utils.now())
+        : new Date().toLocaleTimeString('id-ID');
+    } catch { jam = ''; }
+    const inti = item.name
+      ? (item.headline + ' — ' + item.name)
+      : (item.message || item.headline || '');
+    textEl.textContent = (jam ? jam + ' · ' : '') + inti;
+  }
+  function initScanLast() {
+    if (typeof Scanner !== 'undefined' && Scanner.setResultHook) {
+      Scanner.setResultHook(renderScanLast);
+    }
   }
 
   function initSidebarToggle() {
@@ -540,6 +586,7 @@
     initSidebarToggle();
     initScanToggles();
     initDashClock();
+    initScanLast();
     try { if (typeof Simulator !== 'undefined') Simulator.init(); } catch { /* ignore */ }
 
     if (Auth.isLoggedIn()) {

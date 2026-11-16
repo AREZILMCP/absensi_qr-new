@@ -9,7 +9,7 @@
    ------------------------------------------------------------ */
 const Demo = (() => {
   const FLAG_KEY = 'absensi_demo_mode';
-  const DATA_KEY = 'absensi_demo_data_v1';
+  const DATA_KEY = 'absensi_demo_data_v2';
 
   const DEMO_USERNAME = 'demo';
   const DEMO_PASSWORD = 'demo123';

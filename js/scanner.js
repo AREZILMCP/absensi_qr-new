@@ -41,13 +41,11 @@ const Scanner = (() => {
   const MODE_TEXT = {
     presensi: {
       title: 'Scan QR Karyawan — Presensi',
-      desc: 'Pagi check-in (maks 08:15) &middot; 16:00 check-out &middot; lewat 16:00 lembur.',
-      hint: 'Pagi check-in (maks 08:15) · 12:00 makan siang · 16:00 check-out · >16:00 lembur',
+      desc: 'Pagi check-in (maks 08:15) &middot; 12:00 makan siang &middot; 16:00 check-out &middot; &gt;16:00 lembur.',
     },
     kantin: {
       title: 'Scan Kantin — Makan',
       desc: '12:00&ndash;13:00 makan siang &middot; &ge;18:00 ekstra makan (lembur &ge; 2 jam). Kupon otomatis terbit.',
-      hint: 'Makan siang 12:00–13:00 · ekstra makan ≥18:00 (lembur ≥ 2 jam) · sekali scan langsung ambil makan',
     },
   };
 
@@ -59,8 +57,6 @@ const Scanner = (() => {
     if (titleEl) titleEl.textContent = t.title;
     const descEl = document.getElementById('scanDesc');
     if (descEl) descEl.innerHTML = t.desc;
-    const hintEl = document.getElementById('heroHint');
-    if (hintEl) hintEl.textContent = t.hint;
     document.querySelectorAll('[data-scan-mode]').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.scanMode === m);
     });
@@ -93,6 +89,8 @@ const Scanner = (() => {
         () => {}
       );
       isScanning = true;
+      fitVideoToHero();
+      watchReaderSize();
     } catch (err) {
       console.error('Scanner: gagal start', err);
       showSimple('Gagal mengakses kamera. Pastikan izin kamera aktif.', 'err');
@@ -102,6 +100,7 @@ const Scanner = (() => {
   }
 
   async function stop() {
+    unwatchReaderSize();
     if (!html5QrCode) {
       isScanning = false;
       return;
@@ -601,6 +600,44 @@ const Scanner = (() => {
   /* ------------------------------------------------------------
      [6] HELPER
      ------------------------------------------------------------ */
+  // html5-qrcode membekukan lebar inline <video> dari ukuran #reader
+  // saat start (tanpa ResizeObserver) — paksa video mengisi hero
+  // (kini persegi 1:1) supaya tidak tampil kecil di tengah layar hitam.
+  function fitVideoToHero() {
+    const reader = document.getElementById(TARGET_ID);
+    if (!reader || typeof reader.querySelector !== 'function') return;
+    const video = reader.querySelector('video');
+    if (!video || !video.style) return;
+    video.style.width = '100%';
+    video.style.height = '100%';
+  }
+
+  // Observer ukuran #reader: terapkan ulang ukuran video 100% saat
+  // layout berubah (resize jendela, toggle kiosk) TANPA restart
+  // scanner — kamera tidak boleh berkedip tiap resize. Debounce 300ms.
+  let readerObserver = null;
+  let fitTimer = null;
+
+  function watchReaderSize() {
+    if (readerObserver) return;
+    const reader = document.getElementById(TARGET_ID);
+    if (!reader) return;
+    if (typeof ResizeObserver === 'undefined') return;
+    readerObserver = new ResizeObserver(() => {
+      if (fitTimer) clearTimeout(fitTimer);
+      fitTimer = setTimeout(fitVideoToHero, 300);
+    });
+    readerObserver.observe(reader);
+  }
+
+  function unwatchReaderSize() {
+    if (readerObserver) {
+      try { readerObserver.disconnect(); } catch { /* abaikan */ }
+      readerObserver = null;
+    }
+    if (fitTimer) { clearTimeout(fitTimer); fitTimer = null; }
+  }
+
   function delay(ms) {
     return new Promise((r) => setTimeout(r, ms));
   }
@@ -611,6 +648,7 @@ const Scanner = (() => {
   return {
     start,
     stop,
+    fitVideoToHero,
     isActive: () => isScanning,
     setMode,
     getMode: () => mode,

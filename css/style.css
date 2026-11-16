@@ -1414,7 +1414,7 @@ input.input-error:focus {
 .hero-scan {
   position: relative;
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: auto 1fr;
   grid-template-rows: 1fr;
   background: #fff;
   border: 1px solid #e2e8f0;
@@ -1427,6 +1427,7 @@ input.input-error:focus {
   position: relative;
   background: #0f172a;
   min-height: 240px;
+  aspect-ratio: 1 / 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1471,6 +1472,14 @@ input.input-error:focus {
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+  align-items: center;
+}
+
+/* Isi panel kanan dipusatkan dengan lebar maks wajar (kamera kini
+   persegi, panel kanan jadi lebar) */
+.hero-side > * {
+  width: 100%;
+  max-width: 560px;
 }
 
 .hero-side .scan-head {
@@ -1483,10 +1492,29 @@ input.input-error:focus {
   margin-top: 0;
 }
 
-.hero-hint {
-  font-size: 0.78rem;
-  color: #94a3b8;
-  line-height: 1.5;
+/* Baris "Terakhir": hasil scan terakhir tetap terlihat setelah
+   overlay gate 1 detik hilang (riwayat lengkap ada di bawah). */
+.scan-last {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: #475569;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.scan-last-lbl {
+  font-weight: 700;
+  color: #0f172a;
+  flex: none;
+}
+
+.scan-last-text {
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 /* Saklar mode scan: presensi vs kantin */
@@ -2532,6 +2560,9 @@ body.kiosk-lite .btn-hamburger-topbar { display: none; }
 
   .hero-cam {
     min-height: 220px;
+    width: 100%;
+    max-width: 480px;
+    justify-self: center;
   }
 
   .search-bar {
@@ -2638,9 +2669,10 @@ body.kiosk-lite .btn-hamburger-topbar { display: none; }
     display: flex; flex-direction: column;
     flex: 1 1 auto; min-height: 0; overflow: hidden;
   }
-  /* Hero kamera: tinggi ikut viewport, kamera mengisi areanya */
-  #panel-dashboard .hero-scan { flex: none; height: clamp(230px, 38vh, 360px); margin-bottom: 14px; }
-  #panel-dashboard .hero-cam { min-height: 0; }
+  /* Hero kamera 16:9: tinggi ikut viewport (34vh, maks 360px) supaya
+     muat di 1920x998 maupun 1440x900; kamera persegi 1:1 selebar tinggi hero */
+  #panel-dashboard .hero-scan { flex: none; height: clamp(230px, 34vh, 360px); margin-bottom: 14px; }
+  #panel-dashboard .hero-cam { min-height: 0; height: 100%; }
   /* Strip simulasi tetap ramping */
   #panel-dashboard .sim-strip { margin-bottom: 12px; flex: none; }
   /* Grid dashboard mengisi sisa layar */

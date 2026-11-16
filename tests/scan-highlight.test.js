@@ -5,6 +5,8 @@
    arti scan, bukan hitungan scan ke berapa (alur 1-2-3-4 dihapus).
    Semua overlay auto-hilang 1 detik; scan baru langsung menggantikan
    (tanpa antrean). Kupon makan otomatis terbit + ditebus satu scan.
+   Kamera persegi 1:1 (aspect-ratio + video 100% + ResizeObserver);
+   baris "Terakhir" di panel kanan hero; kunci data demo v2.
    Yang TIDAK diuji di sini (butuh browser + kamera asli): alur scan
    end-to-end lewat kamera sungguhan.
    Jalankan: node tests/scan-highlight.test.js */
@@ -84,6 +86,10 @@ class El {
     (this._listeners[type] = this._listeners[type] || []).push(fn);
   }
   querySelector(sel) {
+    if (sel === 'video') {
+      if (!this._video) this._video = new El('video');
+      return this._video;
+    }
     if (sel === '.scan-overlay-waiting') {
       if (!this._innerHTML.includes('scan-overlay-waiting')) return null;
       if (!this._badge) this._badge = { hidden: true, textContent: '' };
@@ -217,10 +223,25 @@ function freshScannerCtx(opts) {
         };
       }
     },
+    ResizeObserver: class {
+      constructor(cb) {
+        this.cb = cb;
+        this.observed = null;
+        this.disconnected = false;
+        sandbox.__roInstances.push(this);
+      }
+      observe(el) { this.observed = el; }
+      disconnect() { this.disconnected = true; }
+    },
     Html5Qrcode: class {
       constructor() {}
       start(_opts, _cfg, onDecode) {
         sandbox.__decode = onDecode;
+        state.qrStartCalls = (state.qrStartCalls || 0) + 1;
+        // Simulasi library: bekukan lebar inline <video> dari ukuran
+        // #reader saat start (tanpa ResizeObserver).
+        const video = document.getElementById('reader').querySelector('video');
+        if (video) { video.style.width = '250px'; video.style.height = '250px'; }
         return Promise.resolve();
       }
       stop() { return Promise.resolve(); }
@@ -285,6 +306,7 @@ function freshScannerCtx(opts) {
     Demo: { isEnabled: () => false },
   };
   sandbox.window = sandbox;
+  sandbox.__roInstances = [];
   vm.createContext(sandbox);
   vm.runInContext(read('js/scanner.js'), sandbox, { filename: 'scanner.js' });
   vm.runInContext('globalThis.__Scanner = Scanner;', sandbox);
@@ -890,12 +912,15 @@ async function main() {
     assertHas(html, 'id="dashClockTime"');
     assertHas(html, 'id="dashClockDate"');
     assertHas(html, 'id="gateLayer"');
-    assertHas(html, 'css/style.css?v=dashscan1');
+    assertHas(html, 'css/style.css?v=dashfix1');
     assert(!html.includes('data-scan-start'), 'tidak boleh ada tombol Mulai Scan');
     assert(!html.includes('data-scan-stop'), 'tidak boleh ada tombol Stop');
     assert(!html.includes('btnOpenScanPage'), 'tidak boleh ada tombol Buka Halaman Scan');
     assert(!html.includes('Mulai Scan'), 'teks "Mulai Scan" tidak boleh tersisa');
     assert(!html.includes('scan.html'), 'tidak boleh ada referensi scan.html');
+    assert(!html.includes('heroHint'), 'heroHint harus sudah dihapus');
+    assertHas(html, 'id="scanLast"');
+    assertHas(html, 'id="scanLastText"');
   });
 
   await test('scan.html + js/scan-page.js sudah dihapus', async () => {
@@ -923,6 +948,122 @@ async function main() {
     assertHas(css, '.topbar-clock-time');
     assert(!css.includes('body.scan-page'), 'CSS scan-page harus sudah dihapus');
     assert(!css.includes('scan-page-clock'), 'CSS jam scan-page harus sudah dihapus');
+    assertHas(css, 'aspect-ratio: 1 / 1');
+    assertHas(css, 'grid-template-columns: auto 1fr');
+    assertHas(css, 'max-width: 560px');
+    assertHas(css, 'clamp(230px, 34vh, 360px)');
+    assertHas(css, '.scan-last');
+    assert(!css.includes('.hero-hint {'), 'aturan .hero-hint harus sudah dihapus');
+  });
+
+  await test('scanner.js: MODE_TEXT hanya title+desc; desc presensi satu baris aturan lengkap', async () => {
+    const src = read('js/scanner.js');
+    assert(!src.includes('heroHint'), 'scanner.js tidak boleh lagi menyentuh heroHint');
+    assert(!src.includes('hint:'), 'MODE_TEXT tidak boleh lagi punya field hint');
+    assertHas(src, "desc: 'Pagi check-in (maks 08:15) &middot; 12:00 makan siang &middot; 16:00 check-out &middot; &gt;16:00 lembur.'");
+    assertHas(src, "desc: '12:00&ndash;13:00 makan siang &middot; &ge;18:00 ekstra makan (lembur &ge; 2 jam). Kupon otomatis terbit.'");
+  });
+
+  await test('setMode: judul + desc satu baris per mode', async () => {
+    const ctx = freshScannerCtx({ karyawan: [] });
+    ctx.__Scanner.setMode('presensi');
+    assert(ctx.document.getElementById('scanTitle').textContent === 'Scan QR Karyawan — Presensi', 'judul presensi');
+    assert(ctx.document.getElementById('scanDesc').innerHTML === 'Pagi check-in (maks 08:15) &middot; 12:00 makan siang &middot; 16:00 check-out &middot; &gt;16:00 lembur.', 'desc presensi satu baris');
+    ctx.__Scanner.setMode('kantin');
+    assert(ctx.document.getElementById('scanTitle').textContent === 'Scan Kantin — Makan', 'judul kantin');
+    assert(ctx.document.getElementById('scanDesc').innerHTML === '12:00&ndash;13:00 makan siang &middot; &ge;18:00 ekstra makan (lembur &ge; 2 jam). Kupon otomatis terbit.', 'desc kantin');
+  });
+
+  await test('main.js: auto-start kamera ditunda (double rAF + 300ms) dengan guard dashboard', async () => {
+    const src = read('js/main.js');
+    assertHas(src, 'scheduleDashboardScanStart');
+    assertHas(src, 'requestAnimationFrame');
+    assertHas(src, 'startDashboardScanner');
+    assertHas(src, 'setTimeout(startDashboardScanner, 300)');
+    assertHas(src, "panel-dashboard");
+    assertHas(src, "if (tab === 'dashboard')");
+  });
+
+  await test('main.js: baris Terakhir dihubungkan lewat Scanner.setResultHook', async () => {
+    const src = read('js/main.js');
+    assertHas(src, 'setResultHook');
+    assertHas(src, 'renderScanLast');
+    assertHas(src, 'initScanLast');
+    assertHas(src, 'scanLastText');
+    assertHas(src, 'initScanLast();');
+  });
+
+  await test('demo.js: kunci data demo v2; data v1 lama diabaikan, seed baru 4 karyawan + 2 kartu', async () => {
+    const src = read('js/demo.js');
+    assertHas(src, 'absensi_demo_data_v2');
+    assert(!src.includes('absensi_demo_data_v1'), 'kunci v1 tidak boleh tersisa');
+    const doc = makeDocument();
+    const localStorage = makeLocalStorage();
+    // Data demo LAMA model hitung-scan ("Kupon Makan" 07:55) di kunci v1.
+    localStorage.setItem('absensi_demo_data_v1', JSON.stringify({
+      karyawan: [{ id: 'K0001', nama: 'Reza Kurnia' }],
+      riwayat: [{ nama: 'Reza Kurnia', jenis: 'Kupon Makan', waktu: '07:55' }],
+    }));
+    const sandbox = { console, document: doc, localStorage };
+    vm.createContext(sandbox);
+    vm.runInContext(read('js/demo.js'), sandbox, { filename: 'demo.js' });
+    vm.runInContext('globalThis.__Demo = Demo;', sandbox);
+    const snap = sandbox.__Demo.ensureSeed();
+    assert(snap.karyawan.length === 4, 'seed baru harus 4 karyawan');
+    assert(snap.karyawan[0].id === 'K0001' && snap.karyawan[0].nama === 'Reza Kurnia', 'seed K0001 Reza Kurnia');
+    assert(snap.jenisKartu.length === 2, 'seed harus 2 jenis kartu');
+    assert(snap.riwayat.length === 0, 'riwayat seed baru harus kosong (tanpa "Kupon Makan" 07:55)');
+    assert(localStorage.getItem('absensi_demo_data_v2') !== null, 'seed baru harus tersimpan di kunci v2');
+  });
+
+  console.log('== video persegi 1:1 — fitVideoToHero + ResizeObserver ==');
+
+  await test('video: setelah start, video #reader dipaksa 100% x 100% (menimpa inline bekuan library)', async () => {
+    const ctx = freshScannerCtx({ karyawan: [] });
+    await ctx.__Scanner.start();
+    const video = ctx.document.getElementById('reader').querySelector('video');
+    assert(video.style.width === '100%', 'lebar video harus 100%, dapat ' + video.style.width);
+    assert(video.style.height === '100%', 'tinggi video harus 100%, dapat ' + video.style.height);
+  });
+
+  await test('video: fitVideoToHero diekspor dan bisa dipanggil langsung', async () => {
+    const ctx = freshScannerCtx({ karyawan: [] });
+    assert(typeof ctx.__Scanner.fitVideoToHero === 'function', 'fitVideoToHero harus diekspor');
+    const video = ctx.document.getElementById('reader').querySelector('video');
+    video.style.width = '250px';
+    video.style.height = '250px';
+    ctx.__Scanner.fitVideoToHero();
+    assert(video.style.width === '100%' && video.style.height === '100%', 'fitVideoToHero harus memaksa 100%');
+  });
+
+  await test('video: ResizeObserver terpasang saat start; resize menerapkan ulang 100% tanpa restart scanner', async () => {
+    const ctx = freshScannerCtx({ karyawan: [] });
+    await ctx.__Scanner.start();
+    assert(ctx.__roInstances.length === 1, 'satu ResizeObserver harus terpasang');
+    const ro = ctx.__roInstances[0];
+    assert(ro.observed === ctx.document.getElementById('reader'), 'observer harus mengamati #reader');
+    const video = ctx.document.getElementById('reader').querySelector('video');
+    video.style.width = '250px'; // simulasi ukuran meleset setelah resize/kiosk
+    ro.cb();
+    assert(ctx.__pendingTimerMs().includes(300), 'debounce 300ms harus terjadwal, dapat ' + ctx.__pendingTimerMs());
+    ctx.__runOneTimer();
+    assert(video.style.width === '100%' && video.style.height === '100%', 'video harus kembali 100% setelah debounce');
+    assert(ctx.__state.qrStartCalls === 1, 'scanner tidak boleh restart saat resize, start=' + ctx.__state.qrStartCalls);
+  });
+
+  await test('video: stop() melepas observer (disconnect)', async () => {
+    const ctx = freshScannerCtx({ karyawan: [] });
+    await ctx.__Scanner.start();
+    await ctx.__Scanner.stop();
+    assert(ctx.__roInstances[0].disconnected === true, 'observer harus disconnect saat stop');
+  });
+
+  await test('video: tanpa ResizeObserver (browser lama) start tetap jalan, video tetap 100%', async () => {
+    const ctx = freshScannerCtx({ karyawan: [] });
+    delete ctx.ResizeObserver;
+    await ctx.__Scanner.start();
+    const video = ctx.document.getElementById('reader').querySelector('video');
+    assert(video.style.width === '100%', 'tanpa ResizeObserver pun video harus 100%');
   });
 
   await test('utils: formatJam + formatTanggalID (kode asli)', async () => {
