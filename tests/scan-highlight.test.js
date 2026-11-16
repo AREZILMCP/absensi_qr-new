@@ -937,7 +937,7 @@ async function main() {
     assertHas(html, 'id="gateLayer"');
     assertHas(html, 'id="btnToggleCamera"');
     assertHas(html, 'Nyalakan Kamera');
-    assertHas(html, 'css/style.css?v=camtoggle1');
+    assertHas(html, 'css/style.css?v=overlay1');
     assert(!html.includes('data-scan-start'), 'tidak boleh ada tombol Mulai Scan');
     assert(!html.includes('data-scan-stop'), 'tidak boleh ada tombol Stop');
     assert(!html.includes('btnOpenScanPage'), 'tidak boleh ada tombol Buka Halaman Scan');
@@ -980,6 +980,38 @@ async function main() {
     assertHas(css, '.scan-last');
     assertHas(css, '.camera-toggle');
     assert(!css.includes('.hero-hint {'), 'aturan .hero-hint harus sudah dihapus');
+  });
+
+  await test('css: overlay hasil scan besar + terpusat (headline/nama/kode kupon, ikon & foto 88px)', async () => {
+    const css = read('css/style.css');
+    // Terpusat: baris overlay justify-content center, blok info text-align center, kupon terpusat
+    assertHas(css, 'align-items: center;\n  justify-content: center;\n  gap: 18px;');
+    assertHas(css, '.scan-overlay-info { flex: 1; min-width: 0; text-align: center; }');
+    assertHas(css, 'align-items: baseline; justify-content: center; gap: 10px;');
+    // Lebih besar (tetap muat di hero ~339px)
+    assertHas(css, '.scan-overlay-headline {\n  font-size: clamp(1.5rem, 3vw, 2.2rem);');
+    assertHas(css, '.scan-overlay-name {\n  font-size: clamp(2.5rem, 5vw, 3.75rem);');
+    assertHas(css, '.scan-overlay-meta { font-size: 1rem; opacity: 0.85; }');
+    assertHas(css, '.scan-overlay-detail { font-size: clamp(1.05rem, 1.6vw, 1.35rem); margin-top: 2px; }');
+    assertHas(css, '.scan-overlay-kupon-lbl { font-size: 0.9rem;');
+    assertHas(css, '.scan-overlay-kupon-kode { font-size: clamp(1.8rem, 3.4vw, 2.6rem);');
+    // Ikon & foto 88px (bukan 72px lagi)
+    assertHas(css, 'width: 88px;\n  height: 88px;\n  border-radius: 50%;\n  background: rgba(255, 255, 255, 0.18);');
+    assertHas(css, 'font-size: 3rem;\n  font-weight: 700;\n  line-height: 1;');
+    assertHas(css, 'width: 88px;\n  height: 88px;\n  border-radius: 50%;\n  overflow: hidden;');
+    assertHas(css, '.scan-overlay-photo .scan-photo-initial { font-size: 2.2rem; color: #fff; }');
+    assert(!css.includes('width: 72px;'), 'ikon/foto overlay tidak boleh lagi 72px');
+    // Nama tetap nowrap + ellipsis supaya nama panjang tidak merusak layout
+    assertHas(css, 'white-space: nowrap;');
+    // Warna latar per tipe tidak berubah
+    assertHas(css, '.scan-overlay-ok   { background: #047857; }');
+    assertHas(css, '.scan-overlay-warn { background: #b45309; }');
+    assertHas(css, '.scan-overlay-err  { background: #b91c1c; }');
+    // Layar kecil: foto tetap hidden, ikon 64px, teks turun proporsional
+    assertHas(css, '.scan-overlay-icon { width: 64px; height: 64px; font-size: 2.2rem; }');
+    assertHas(css, '.scan-overlay-headline { font-size: clamp(1.2rem, 4vw, 1.6rem); }');
+    assertHas(css, '.scan-overlay-name { font-size: clamp(1.8rem, 6vw, 2.2rem); }');
+    assertHas(css, '.scan-overlay-kupon-kode { font-size: clamp(1.4rem, 5vw, 1.8rem); }');
   });
 
   await test('scanner.js: MODE_TEXT hanya title+desc; desc presensi satu baris aturan lengkap', async () => {
