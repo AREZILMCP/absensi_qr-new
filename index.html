@@ -173,6 +173,8 @@
         </div>
 
         <div class="topbar-right">
+          <button type="button" class="btn-topbar-icon" id="btnSoundToggle" title="Bunyi scan: aktif — klik untuk mematikan" aria-label="Bunyi scan" aria-pressed="true">🔊</button>
+          <button type="button" class="btn-topbar-icon btn-kiosk" id="btnKioskToggle" title="Mode Kiosk: sembunyikan menu untuk PC standby" aria-pressed="false">⛶ Mode Kiosk</button>
           <button type="button" class="demo-badge" id="demoBadge" hidden title="Mode Demo aktif &mdash; klik untuk mematikan dan kembali ke login server">MODE DEMO</button>
           <span class="user-name" id="userName">Admin</span>
           <div class="avatar" id="userAvatar">A</div>
@@ -202,9 +204,9 @@
                 <button type="button" class="btn btn-success" data-scan-start="qr">Mulai Scan</button>
                 <button type="button" class="btn btn-danger" data-scan-stop>Stop</button>
               </div>
-              <div class="result" id="resultScan"></div>
               <p class="hero-hint" id="heroHint">Scan 1 masuk &middot; Scan 2 kupon makan &middot; Scan 3 pulang &middot; Scan 4 kupon lembur</p>
             </div>
+            <div class="result scan-overlay" id="resultScan" role="status" aria-live="polite"></div>
           </div>
 
           <!-- Strip ramping: simulasi aktif cukup ditandai satu baris; panel lengkap pindah ke modal Pengaturan Demo (FAB) -->
@@ -1001,6 +1003,7 @@
   <script src="js/qrcode.js"></script>
   <script src="js/scanner.js"></script>
   <script src="js/dashboard.js"></script>
+  <script src="js/kiosk.js"></script>
   <script src="js/simulator.js"></script>
   <script src="js/main.js"></script>
 </body>

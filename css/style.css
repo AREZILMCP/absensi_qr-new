@@ -1412,6 +1412,7 @@ input.input-error:focus {
 
 /* ---------- [10.4] Hero scan — preview kamera jadi fokus dashboard ---------- */
 .hero-scan {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr 320px;
   grid-template-rows: 1fr;
@@ -1479,13 +1480,6 @@ input.input-error:focus {
 
 .hero-side .scan-controls {
   justify-content: flex-start;
-  margin-top: 0;
-}
-
-.hero-side .result {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
   margin-top: 0;
 }
 
@@ -1652,6 +1646,167 @@ input.input-error:focus {
 .scan-msg-ok  { background: #ecfdf5; color: #065f46; }
 .scan-msg-err { background: #fef2f2; color: #991b1b; }
 .scan-msg-warn{ background: #fffbeb; color: #92400e; }
+
+/* ---------- [10.5] Overlay hasil scan — memenuhi hero (plan UX §3) ---------- */
+/* #resultScan dipindah jadi anak langsung .hero-scan; tampil sebagai
+   overlay solid (bukan kartu kecil di kolom kanan) supaya terbaca
+   dari jarak 2-3 meter. Warna + ikon + kata, bukan warna saja. */
+.scan-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: none;
+  margin: 0;
+  min-height: 0;
+  border-radius: 10px;
+}
+
+.scan-overlay.show { display: flex; }
+
+.scan-overlay-inner {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 20px;
+  color: #fff;
+  position: relative;
+  animation: scanPop 0.25s ease;
+}
+
+.scan-overlay-ok   { background: #047857; }
+.scan-overlay-warn { background: #b45309; }
+.scan-overlay-err  { background: #b91c1c; }
+
+.scan-overlay-icon {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.4rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.scan-overlay-info { flex: 1; min-width: 0; text-align: left; }
+
+.scan-overlay-headline {
+  font-size: clamp(1.05rem, 2.2vw, 1.6rem);
+  font-weight: 800;
+  letter-spacing: 0.4px;
+}
+
+.scan-overlay-name {
+  font-size: clamp(1.75rem, 4vw, 3rem);
+  font-weight: 800;
+  line-height: 1.05;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scan-overlay-meta { font-size: 0.85rem; opacity: 0.85; }
+.scan-overlay-detail { font-size: 0.95rem; margin-top: 2px; }
+
+.scan-overlay-kupon { margin-top: 6px; display: flex; align-items: baseline; gap: 10px; }
+.scan-overlay-kupon-lbl { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.85; }
+.scan-overlay-kupon-kode { font-size: clamp(1.4rem, 2.8vw, 2rem); font-weight: 800; letter-spacing: 1px; }
+.scan-overlay-note { font-size: 0.85rem; opacity: 0.9; margin-top: 2px; }
+
+.scan-overlay-photo {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scan-overlay-photo img { width: 100%; height: 100%; object-fit: cover; }
+.scan-overlay-photo .scan-photo-initial { font-size: 1.8rem; color: #fff; }
+
+.scan-overlay-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  border: none;
+  background: rgba(0, 0, 0, 0.2);
+  color: #fff;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.scan-overlay-waiting {
+  position: absolute;
+  bottom: 10px;
+  right: 14px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.scan-overlay-waiting[hidden] { display: none; }
+
+@media (max-width: 560px) {
+  .scan-overlay-photo { display: none; }
+  .scan-overlay-icon { width: 56px; height: 56px; font-size: 1.8rem; }
+  .scan-overlay-inner { gap: 12px; padding: 12px 14px; }
+}
+
+/* ---------- [10.6] Flash statistik & sorot riwayat baru (plan UX §3.3) ---------- */
+.stat-num.stat-flash { animation: statFlash 1s ease; }
+
+@keyframes statFlash {
+  0%   { background: #dcfce7; border-radius: 8px; }
+  100% { background: transparent; }
+}
+
+#riwayat tr.riwayat-new td { animation: rowFade 3s ease forwards; }
+
+@keyframes rowFade {
+  0%   { background: #dcfce7; }
+  100% { background: transparent; }
+}
+
+/* ---------- [10.7] Mode Kiosk-lite (plan UX §4, versi prototipe) ---------- */
+/* Sembunyikan sidebar/menu + FAB Pengaturan Demo; topbar tetap ada
+   supaya admin bisa keluar kiosk lewat tombol yang sama. Tanpa PIN,
+   tanpa Wake Lock, tanpa screensaver — sesuai cakupan prototipe. */
+body.kiosk-lite .sidebar,
+body.kiosk-lite .sidebar-backdrop { display: none !important; }
+body.kiosk-lite .fab-demo { display: none !important; }
+body.kiosk-lite .btn-hamburger-topbar { display: none; }
+
+/* ---------- [10.8] Tombol topbar: suara & kiosk ---------- */
+.btn-topbar-icon {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+.btn-topbar-icon:hover { background: #f1f5f9; }
+.btn-topbar-icon.active { background: #0f172a; color: #fff; border-color: #0f172a; }
 
 /* ============================================================
    [11] MODAL — semua dialog popup

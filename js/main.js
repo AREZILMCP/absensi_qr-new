@@ -151,6 +151,30 @@
     });
   }
 
+  // Tombol suara scan (🔊/🔇, tersimpan di localStorage via Scanner)
+  // dan Mode Kiosk-lite (sembunyikan sidebar + FAB, fullscreen).
+  function initScanToggles() {
+    const btnSound = document.getElementById('btnSoundToggle');
+    const syncSoundBtn = () => {
+      if (!btnSound || typeof Scanner === 'undefined') return;
+      const on = Scanner.isSoundEnabled();
+      btnSound.textContent = on ? '🔊' : '🔇';
+      btnSound.setAttribute('aria-pressed', String(on));
+      btnSound.title = on ? 'Bunyi scan: aktif — klik untuk mematikan' : 'Bunyi scan: mati — klik untuk mengaktifkan';
+    };
+    btnSound?.addEventListener('click', () => {
+      if (typeof Scanner === 'undefined') return;
+      Scanner.setSoundEnabled(!Scanner.isSoundEnabled());
+      syncSoundBtn();
+    });
+    syncSoundBtn();
+
+    document.getElementById('btnKioskToggle')?.addEventListener('click', () => {
+      if (typeof Kiosk !== 'undefined') Kiosk.toggle();
+    });
+    try { if (typeof Kiosk !== 'undefined') Kiosk.init(); } catch { /* abaikan */ }
+  }
+
   function initSidebarToggle() {
     const btnOpen  = document.getElementById('btnSidebarToggle');
     const btnClose = document.getElementById('btnSidebarClose');
@@ -484,6 +508,7 @@
   async function init() {
     bindLoginForm();
     initSidebarToggle();
+    initScanToggles();
     try { if (typeof Simulator !== 'undefined') Simulator.init(); } catch { /* ignore */ }
 
     if (Auth.isLoggedIn()) {

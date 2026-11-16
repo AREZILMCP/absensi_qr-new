@@ -1,6 +1,13 @@
 const Dashboard = (() => {
   const { escapeHtml } = Utils;
 
+  // Nilai statistik & jumlah riwayat pada render sebelumnya.
+  // Dipakai untuk flash angka yang berubah + sorot baris riwayat baru
+  // setelah scan berhasil (plan UX §3.3). Render pertama (prev = null)
+  // tidak mem-flash apa pun.
+  let prevStats = null;
+  let prevRiwayatLen = null;
+
   /* ------------------------------------------------------------
      [1] RENDER UTAMA — panggil semua sub-render
      ------------------------------------------------------------ */
@@ -73,6 +80,12 @@ const Dashboard = (() => {
     setText('statMakan', makan);
     setText('statBelum', belum);
 
+    // Flash hijau 1 detik pada angka yang berubah sejak render lalu.
+    flashChanged({
+      statTotal: total, statHadir: hadir, statMakan: makan, statBelum: belum,
+      kuponTerbit: terbit, lemburHariIni: lembur,
+    });
+
     setText('legendTepat', tepat);
     setText('legendTelat', telat);
     setText('legendBelum', belum);
@@ -90,6 +103,21 @@ const Dashboard = (() => {
   function setText(id, val) {
     const el = document.getElementById(id);
     if (el) el.textContent = val;
+  }
+
+  // Beri class .stat-flash pada angka yang nilainya berubah; class
+  // dilepas lagi setelah 1 detik. Tanpa perubahan: tidak ada flash.
+  function flashChanged(next) {
+    const prev = prevStats;
+    prevStats = next;
+    if (!prev) return;
+    Object.keys(next).forEach((id) => {
+      if (prev[id] === next[id]) return;
+      const el = document.getElementById(id);
+      if (!el || !el.classList) return;
+      el.classList.add('stat-flash');
+      setTimeout(() => el.classList.remove('stat-flash'), 1000);
+    });
   }
 
   // Donut 3 segmen: tepat waktu (hijau) / terlambat (kuning) / belum (abu).
@@ -120,6 +148,9 @@ const Dashboard = (() => {
       return;
     }
 
+    const bertambah = prevRiwayatLen !== null && riwayat.length > prevRiwayatLen;
+    prevRiwayatLen = riwayat.length;
+
     tbody.innerHTML = riwayat
       .slice(0, 10)
       .map(
@@ -131,6 +162,12 @@ const Dashboard = (() => {
         </tr>`
       )
       .join('');
+
+    // Baris paling atas = entri terbaru: sorot hijau yang memudar 3 detik.
+    if (bertambah) {
+      const firstRow = tbody.querySelector('tr');
+      if (firstRow && firstRow.classList) firstRow.classList.add('riwayat-new');
+    }
   }
 
   /* ------------------------------------------------------------
