@@ -1472,14 +1472,28 @@ input.input-error:focus {
   flex-direction: column;
   gap: 12px;
   min-width: 0;
-  align-items: center;
+  align-items: flex-start;
+  justify-content: space-between;
 }
 
-/* Isi panel kanan dipusatkan dengan lebar maks wajar (kamera kini
-   persegi, panel kanan jadi lebar) */
+/* Isi panel kanan rata kiri dengan lebar maks wajar (kamera kini
+   persegi, panel kanan jadi lebar). Kolom sempit terpusat dihapus:
+   di layar 16:9 menyisakan ~350px ruang putih di tiap sisi + ~100px
+   kosong di bawah konten. */
 .hero-side > * {
   width: 100%;
-  max-width: 560px;
+  max-width: 900px;
+}
+
+/* Tombol kamera: lebar auto (bukan full-width seperti anak lain). */
+.hero-side #btnToggleCamera {
+  width: auto;
+  min-width: 220px;
+}
+
+/* Kotak "Terakhir" lebih sempit dari isi lain. */
+.hero-side .scan-last {
+  max-width: 720px;
 }
 
 .hero-side .scan-head {
@@ -1690,7 +1704,9 @@ input.input-error:focus {
 .scan-overlay {
   position: absolute;
   inset: 0;
-  z-index: 20;
+  /* Di atas gate layer (4500) supaya teks hasil scan tetap terlihat
+     saat flash gate; di bawah modal (5000). */
+  z-index: 4600;
   display: none;
   margin: 0;
   min-height: 0;
@@ -1731,7 +1747,7 @@ input.input-error:focus {
   line-height: 1;
 }
 
-.scan-overlay-info { flex: 1; min-width: 0; text-align: center; }
+.scan-overlay-info { flex: 0 1 auto; max-width: min(880px, 72%); min-width: 0; text-align: center; }
 
 .scan-overlay-headline {
   font-size: clamp(1.5rem, 3vw, 2.2rem);
@@ -1831,10 +1847,10 @@ input.input-error:focus {
    (tanpa teks), tersinkron dengan overlay hero lewat Scanner
    (showOverlay/clearResult): hijau sukses, merah gagal, kuning peringatan.
    Muncul 1 detik bersama overlay, lalu hilang; riwayat + statistik tetap
-   terlihat setelahnya. z-index di bawah overlay hero (20) dan modal
-   (5000), di atas konten biasa; pointer-events none supaya tidak
-   menghalangi klik. */
-.gate-layer { position: fixed; inset: 0; z-index: 10; pointer-events: none; display: none; }
+   terlihat setelahnya. z-index 4500 — di atas FAB (4000) supaya tombol
+   demo tidak menembus flash gate, di bawah overlay hero (4600) dan
+   modal (5000); pointer-events none supaya tidak menghalangi klik. */
+.gate-layer { position: fixed; inset: 0; z-index: 4500; pointer-events: none; display: none; }
 .gate-layer.show { display: block; }
 .gate-layer.gate-ok { background: #047857; }
 .gate-layer.gate-warn { background: #b45309; }

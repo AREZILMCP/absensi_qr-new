@@ -944,7 +944,7 @@ async function main() {
     assertHas(html, 'id="gateLayer"');
     assertHas(html, 'id="btnToggleCamera"');
     assertHas(html, 'Nyalakan Kamera');
-    assertHas(html, 'css/style.css?v=overlay1');
+    assertHas(html, 'css/style.css?v=layoutfix1');
     assert(!html.includes('data-scan-start'), 'tidak boleh ada tombol Mulai Scan');
     assert(!html.includes('data-scan-stop'), 'tidak boleh ada tombol Stop');
     assert(!html.includes('btnOpenScanPage'), 'tidak boleh ada tombol Buka Halaman Scan');
@@ -982,18 +982,38 @@ async function main() {
     assert(!css.includes('scan-page-clock'), 'CSS jam scan-page harus sudah dihapus');
     assertHas(css, 'aspect-ratio: 1 / 1');
     assertHas(css, 'grid-template-columns: auto 1fr');
-    assertHas(css, 'max-width: 560px');
+    assert(!css.includes('max-width: 560px;'), 'kolom sempit terpusat 560px harus sudah dihapus');
     assertHas(css, 'clamp(230px, 34vh, 360px)');
     assertHas(css, '.scan-last');
     assertHas(css, '.camera-toggle');
     assert(!css.includes('.hero-hint {'), 'aturan .hero-hint harus sudah dihapus');
   });
 
+  await test('css: layout hero 16:9 — panel kanan rata kiri, overlay terpusat sebagai grup, gate di atas FAB', async () => {
+    const css = read('css/style.css');
+    // Panel kanan hero: rata kiri + disebar vertikal, bukan kolom sempit terpusat
+    assertHas(css, 'align-items: flex-start;\n  justify-content: space-between;');
+    assertHas(css, 'max-width: 900px;');
+    assert(!css.includes('max-width: 560px;'), 'max-width 560px terpusat harus sudah dihapus');
+    // Tombol kamera lebar auto (bukan full-width), kotak Terakhir lebih sempit
+    assertHas(css, '.hero-side #btnToggleCamera {\n  width: auto;\n  min-width: 220px;\n}');
+    assertHas(css, '.hero-side .scan-last {\n  max-width: 720px;\n}');
+    // Overlay terpusat sebagai grup: info tidak flex:1, lebar maks dibatasi
+    assertHas(css, '.scan-overlay-info { flex: 0 1 auto; max-width: min(880px, 72%); min-width: 0; text-align: center; }');
+    // Ukuran teks besar dari 346bb32 dipertahankan
+    assertHas(css, '.scan-overlay-headline {\n  font-size: clamp(1.5rem, 3vw, 2.2rem);');
+    assertHas(css, '.scan-overlay-name {\n  font-size: clamp(2.5rem, 5vw, 3.75rem);');
+    // Gate di atas FAB (4000), overlay hero di atas gate, modal tetap paling atas
+    assertHas(css, 'z-index: 4500;');
+    assertHas(css, 'z-index: 4600;');
+    assertHas(css, 'z-index: 5000;');
+  });
+
   await test('css: overlay hasil scan besar + terpusat (headline/nama/kode kupon, ikon & foto 88px)', async () => {
     const css = read('css/style.css');
     // Terpusat: baris overlay justify-content center, blok info text-align center, kupon terpusat
     assertHas(css, 'align-items: center;\n  justify-content: center;\n  gap: 18px;');
-    assertHas(css, '.scan-overlay-info { flex: 1; min-width: 0; text-align: center; }');
+    assertHas(css, '.scan-overlay-info { flex: 0 1 auto; max-width: min(880px, 72%); min-width: 0; text-align: center; }');
     assertHas(css, 'align-items: baseline; justify-content: center; gap: 10px;');
     // Lebih besar (tetap muat di hero ~339px)
     assertHas(css, '.scan-overlay-headline {\n  font-size: clamp(1.5rem, 3vw, 2.2rem);');
