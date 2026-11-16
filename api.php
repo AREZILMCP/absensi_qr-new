@@ -704,12 +704,10 @@ function handleScan(PDO $pdo): void {
           $message = 'Makan siang berhasil — kupon otomatis terbit, silakan ambil makanan';
         }
       } else {
-        // jamEkstra (>= 18:00)
-        $lemburMenit = ($pulangToday && $pulangMenit !== null) ? max(0, $pulangMenit - $menitPulang) : 0;
-        if (!$pulangToday || $lemburMenit < $menitLemburMakan) {
-          $type = 'warn'; $aksi = 'tolak';
-          $message = 'Belum 2 jam lembur — ekstra makan setelah lembur 2 jam (≥18:00)';
-        } elseif ($ekstraMakanToday) {
+        // jamEkstra (>= 18:00) — karyawan MASIH KERJA: ekstra makan TIDAK
+        // mensyaratkan sudah absen pulang. Lembur diukur dari jam saat ini.
+        $lemburMenit = max(0, $menit - $menitPulang);
+        if ($ekstraMakanToday) {
           $type = 'warn'; $aksi = 'tolak';
           $message = 'Sudah ambil ekstra makan hari ini';
         } else {

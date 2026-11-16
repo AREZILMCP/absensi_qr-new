@@ -534,7 +534,7 @@ async function main() {
     assert(ctx.__state.riwayat[0].jenis === 'Ekstra Makan', 'riwayat Ekstra Makan tercatat');
   });
 
-  await test('kantin 18:00 lembur < 2 jam (pulang 16:05): warn BELUM 2 JAM LEMBUR', async () => {
+  await test('kantin 18:00 sudah pulang 16:05 (lembur 5 menit) tetap EKSTRA MAKAN — jam sudah >= 18:00', async () => {
     const ctx = freshScannerCtx({
       karyawan: [emp('K0001', 'Reza Kurnia', {
         absen: true, absenAt: '2026-11-16T08:05:00',
@@ -546,8 +546,15 @@ async function main() {
     ctx.__setNow(18, 0);
     ctx.__Scanner.setMode('kantin');
     const el = await startAndScan(ctx, 'K0001');
-    assertHas(el.className, 'scan-overlay-warn');
-    assertHas(el.innerHTML, 'BELUM 2 JAM LEMBUR');
+    assertHas(el.className, 'scan-overlay-ok');
+    assertHas(el.innerHTML, 'EKSTRA MAKAN');
+    const k = ctx.__state.karyawan[0];
+    assert(k.kuponJenis === 'lembur' && k.kuponStatus === 'ditebus',
+      'kupon lembur harus terbit + ditebus');
+    assert(ctx.__state.archive.length === 1 &&
+      ctx.__state.archive[0].keterangan === 'Makan siang (diganti kupon lembur)',
+      'kupon siang lama harus diarsipkan dulu');
+    assert(ctx.__state.riwayat[0].jenis === 'Ekstra Makan', 'riwayat Ekstra Makan tercatat');
   });
 
   await test('QR tidak dikenal: err QR TIDAK DIKENALI, timer 1 detik, beep 220Hz', async () => {

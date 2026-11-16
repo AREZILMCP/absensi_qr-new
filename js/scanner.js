@@ -248,11 +248,11 @@ const Scanner = (() => {
         }
         return { type: 'ok', aksi: 'makan-siang', message: 'Makan siang berhasil — kupon otomatis terbit, silakan ambil makanan', lemburMenit: 0 };
       }
-      // jamEkstra (>= 18:00)
-      const lemburMenit = st.pulangToday && st.pulangMenit != null ? Math.max(0, st.pulangMenit - PULANG) : 0;
-      if (!st.pulangToday || lemburMenit < LEMBUR_MAKAN) {
-        return { type: 'warn', aksi: 'tolak', message: 'Belum 2 jam lembur — ekstra makan setelah lembur 2 jam (≥18:00)', lemburMenit };
-      }
+      // jamEkstra (>= 18:00) — karyawan MASIH KERJA: ekstra makan TIDAK
+      // mensyaratkan sudah absen pulang (pulang adalah akhir hari kerja;
+      // karyawan lembur ke kantin dulu, baru pulang belakangan). Lembur
+      // diukur dari jam saat ini, bukan dari jam pulang.
+      const lemburMenit = Math.max(0, nowMin - PULANG);
       if (st.ekstraMakanToday) {
         return { type: 'warn', aksi: 'tolak', message: 'Sudah ambil ekstra makan hari ini', lemburMenit };
       }
@@ -411,7 +411,6 @@ const Scanner = (() => {
     if (/Di luar jam makan/i.test(m)) return 'DI LUAR JAM MAKAN';
     if (/Sudah ambil makan siang/i.test(m)) return 'SUDAH AMBIL MAKAN';
     if (/Sudah ambil ekstra makan/i.test(m)) return 'SUDAH EKSTRA MAKAN';
-    if (/Belum 2 jam lembur/i.test(m)) return 'BELUM 2 JAM LEMBUR';
     if (/Ekstra makan berhasil/i.test(m)) return 'EKSTRA MAKAN';
     if (/Makan siang berhasil/i.test(m)) return 'MAKAN SIANG';
     if (/Absensi pulang/i.test(m)) return 'ABSENSI PULANG';

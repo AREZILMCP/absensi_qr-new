@@ -5,7 +5,7 @@
    Batas yang diuji: check-in 07:55/08:00/08:01/08:15/08:16/08:30,
    checkout 15:59/16:00/16:01/17:00/18:05, jendela kantin
    11:59/12:00/12:30/13:00/13:01/17:30/17:59/18:00/18:05, lembur
-   119 vs 120 menit untuk ekstra makan, dan jalur server-first
+   119 vs 120 menit untuk ekstra makan (diukur dari jam saat ini), dan jalur server-first
    (sukses / 401 / offline / respons invalid / Mode Demo / simulasi).
    Jalankan: node tests/scan-dynamic.test.js */
 'use strict';
@@ -380,12 +380,29 @@ async function main() {
     assertHas(el.innerHTML, 'BELUM ABSEN MASUK');
   });
 
-  console.log('== kantin — ekstra makan (lembur >= 120 menit) ==');
+  console.log('== kantin — ekstra makan (>= 18:00, tanpa syarat pulang) ==');
 
-  await test('kantin 18:00 lembur pas 120 menit (pulang 18:00) -> EKSTRA MAKAN', async () => {
-    const ctx = freshScannerCtx({
-      karyawan: [sudahMakan({ pulangAt: '2026-11-16T18:00:00' })],
-    });
+  await test('kantin 18:10 belum pulang (absen saja, kasus Reza) -> EKSTRA MAKAN', async () => {
+    const ctx = freshScannerCtx({ karyawan: [sudahMasuk()] });
+    ctx.__setNow(18, 10);
+    ctx.__Scanner.setMode('kantin');
+    const el = await startAndScan(ctx, 'K0001');
+    assertHas(el.innerHTML, 'EKSTRA MAKAN');
+    assert(ctx.__state.karyawan[0].kuponJenis === 'lembur', 'kupon harus jenis lembur');
+    assert(ctx.__state.riwayat[0].jenis === 'Ekstra Makan', 'riwayat Ekstra Makan tercatat');
+  });
+
+  await test('kantin 17:59 lembur 119 menit dari jam saat ini -> DI LUAR JAM MAKAN', async () => {
+    const ctx = freshScannerCtx({ karyawan: [sudahMasuk()] });
+    ctx.__setNow(17, 59);
+    ctx.__Scanner.setMode('kantin');
+    const el = await startAndScan(ctx, 'K0001');
+    assertHas(el.innerHTML, 'DI LUAR JAM MAKAN');
+    assert(ctx.__state.karyawan[0].makan === false, 'makan tidak boleh tercatat');
+  });
+
+  await test('kantin 18:00 tepat lembur pas 120 menit, belum pulang -> EKSTRA MAKAN', async () => {
+    const ctx = freshScannerCtx({ karyawan: [sudahMasuk()] });
     ctx.__setNow(18, 0);
     ctx.__Scanner.setMode('kantin');
     const el = await startAndScan(ctx, 'K0001');
@@ -393,42 +410,33 @@ async function main() {
     assert(ctx.__state.karyawan[0].kuponJenis === 'lembur', 'kupon harus jenis lembur');
   });
 
-  await test('kantin 18:00 lembur 119 menit (pulang 17:59) -> BELUM 2 JAM LEMBUR', async () => {
+  await test('kantin 18:30 sudah pulang 17:00 -> EKSTRA MAKAN (jam sudah >= 18:00)', async () => {
     const ctx = freshScannerCtx({
-      karyawan: [sudahMakan({ pulangAt: '2026-11-16T17:59:00' })],
+      karyawan: [sudahMakan({ pulangAt: '2026-11-16T17:00:00' })],
     });
-    ctx.__setNow(18, 0);
+    ctx.__setNow(18, 30);
     ctx.__Scanner.setMode('kantin');
     const el = await startAndScan(ctx, 'K0001');
-    assertHas(el.innerHTML, 'BELUM 2 JAM LEMBUR');
-    assert(ctx.__state.karyawan[0].kuponJenis === 'reguler', 'kupon tidak boleh berubah');
+    assertHas(el.innerHTML, 'EKSTRA MAKAN');
+    assert(ctx.__state.karyawan[0].kuponJenis === 'lembur', 'kupon harus jenis lembur');
   });
 
-  await test('kantin 18:05 belum pulang (absen saja) -> BELUM 2 JAM LEMBUR', async () => {
-    const ctx = freshScannerCtx({ karyawan: [sudahMakan()] });
-    ctx.__setNow(18, 5);
-    ctx.__Scanner.setMode('kantin');
-    const el = await startAndScan(ctx, 'K0001');
-    assertHas(el.innerHTML, 'BELUM 2 JAM LEMBUR');
-  });
-
-  await test('kantin 18:05 sudah ekstra makan -> SUDAH EKSTRA MAKAN', async () => {
+  await test('kantin 18:30 sudah ekstra makan -> SUDAH EKSTRA MAKAN', async () => {
     const ctx = freshScannerCtx({
       karyawan: [sudahMakan({
         makan: true, makanAt: '2026-11-16T18:05:00',
         kuponKode: 'TR-2611-002', kuponStatus: 'ditebus', kuponJenis: 'lembur',
-        pulangAt: '2026-11-16T18:05:00',
       })],
     });
-    ctx.__setNow(18, 5);
+    ctx.__setNow(18, 30);
     ctx.__Scanner.setMode('kantin');
     const el = await startAndScan(ctx, 'K0001');
     assertHas(el.innerHTML, 'SUDAH EKSTRA MAKAN');
   });
 
-  await test('kantin 18:05 belum check-in -> BELUM ABSEN MASUK (didahulukan dari lembur)', async () => {
+  await test('kantin 18:30 belum check-in -> BELUM ABSEN MASUK', async () => {
     const ctx = freshScannerCtx({ karyawan: [emp('K0001', 'Reza Kurnia')] });
-    ctx.__setNow(18, 5);
+    ctx.__setNow(18, 30);
     ctx.__Scanner.setMode('kantin');
     const el = await startAndScan(ctx, 'K0001');
     assertHas(el.innerHTML, 'BELUM ABSEN MASUK');
