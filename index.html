@@ -8,9 +8,11 @@
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
-  <link rel="stylesheet" href="css/style.css?v=scanpage1" />
+  <link rel="stylesheet" href="css/style.css?v=dashscan1" />
 </head>
 <body>
+
+  <div class="gate-layer" id="gateLayer" aria-hidden="true"></div>
 
   <div class="login-screen" id="loginScreen">
     <div class="login-box">
@@ -173,6 +175,10 @@
         </div>
 
         <div class="topbar-right">
+          <div class="topbar-clock" id="dashClock" title="Jam realtime">
+            <span class="topbar-clock-time" id="dashClockTime">--:--:--</span>
+            <span class="topbar-clock-date" id="dashClockDate">&mdash;</span>
+          </div>
           <button type="button" class="btn-topbar-icon" id="btnSoundToggle" title="Bunyi scan: aktif — klik untuk mematikan" aria-label="Bunyi scan" aria-pressed="true">🔊</button>
           <button type="button" class="btn-topbar-icon btn-kiosk" id="btnKioskToggle" title="Mode Kiosk: sembunyikan menu untuk PC standby" aria-pressed="false">⛶ Mode Kiosk</button>
           <button type="button" class="demo-badge" id="demoBadge" hidden title="Mode Demo aktif &mdash; klik untuk mematikan dan kembali ke login server">MODE DEMO</button>
@@ -189,7 +195,7 @@
           <div class="hero-scan">
             <div class="hero-cam">
               <div id="reader"></div>
-              <div class="hero-cam-hint">Kamera belum aktif &mdash; tekan &ldquo;Mulai Scan&rdquo;</div>
+              <div class="hero-cam-hint">Kamera belum aktif &mdash; periksa izin kamera di browser</div>
             </div>
             <div class="hero-side">
               <div class="scan-mode">
@@ -199,13 +205,6 @@
               <div class="scan-head">
                 <h4 id="scanTitle">Scan QR Karyawan</h4>
                 <p id="scanDesc">Jam yang menentukan arti scan: pagi <strong>check-in</strong> (maks 08:15), 16:00 <strong>check-out</strong>, &gt;16:00 <strong>lembur</strong>.</p>
-              </div>
-              <div class="scan-controls">
-                <button type="button" class="btn btn-success" data-scan-start="qr">Mulai Scan</button>
-                <button type="button" class="btn btn-danger" data-scan-stop>Stop</button>
-              </div>
-              <div class="scan-controls">
-                <button type="button" class="btn btn-primary" id="btnOpenScanPage">Buka Halaman Scan</button>
               </div>
               <p class="hero-hint" id="heroHint">Pagi check-in (maks 08:15) &middot; 12:00 makan siang &middot; 16:00 check-out &middot; &gt;16:00 lembur</p>
             </div>

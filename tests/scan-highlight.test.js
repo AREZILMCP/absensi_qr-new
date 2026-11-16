@@ -598,6 +598,55 @@ async function main() {
     assert(seen[0].name === 'Reza Kurnia', 'nama hook harus Reza Kurnia');
   });
 
+  console.log('== gate layer dashboard (lampu memenuhi layar) ==');
+
+  await test('gate: overlay ok -> gateLayer tampil gate-ok; hilang setelah timer 1 detik', async () => {
+    const ctx = freshScannerCtx({ karyawan: [emp('K0001', 'Reza Kurnia')] });
+    const gate = ctx.document.getElementById('gateLayer');
+    const el = await startAndScan(ctx, 'K0001');
+    assertHas(gate.className, 'gate-layer show gate-ok');
+    const ms = ctx.__runOneTimer();
+    assert(ms === 1000, 'timer gate harus 1000ms');
+    assert(gate.className === 'gate-layer', 'gate harus hilang setelah 1 detik, dapat "' + gate.className + '"');
+    assert(el.innerHTML === '', 'overlay hero juga harus hilang');
+  });
+
+  await test('gate: overlay err -> gate-err; warn -> gate-warn', async () => {
+    const ctx = freshScannerCtx({ karyawan: [emp('K0001', 'Reza Kurnia')] });
+    const gate = ctx.document.getElementById('gateLayer');
+    ctx.__setNow(8, 16);
+    await startAndScan(ctx, 'K0001');
+    assertHas(gate.className, 'gate-err');
+    const ctx2 = freshScannerCtx({
+      karyawan: [emp('K0001', 'Reza Kurnia', { absen: true, absenAt: '2026-11-16T08:05:00' })],
+    });
+    const gate2 = ctx2.document.getElementById('gateLayer');
+    ctx2.__setNow(15, 55);
+    await startAndScan(ctx2, 'K0001');
+    assertHas(gate2.className, 'gate-warn');
+  });
+
+  await test('gate: dismissResult menyembunyikan gate lebih awal', async () => {
+    const ctx = freshScannerCtx({ karyawan: [emp('K0001', 'Reza Kurnia')] });
+    const gate = ctx.document.getElementById('gateLayer');
+    await startAndScan(ctx, 'K0001');
+    assertHas(gate.className, 'show');
+    ctx.__Scanner.dismissResult();
+    assert(gate.className === 'gate-layer', 'gate harus hilang setelah dismiss');
+  });
+
+  await test('gate: scan baru menggantikan gate (ok -> err), tetap satu timer', async () => {
+    const ctx = freshScannerCtx({ karyawan: [emp('K0001', 'Reza Kurnia')] });
+    const gate = ctx.document.getElementById('gateLayer');
+    await ctx.__Scanner.start();
+    await ctx.__decode('K0001');
+    assertHas(gate.className, 'gate-ok');
+    await ctx.__decode('K9999');
+    assertHas(gate.className, 'gate-err');
+    assert(ctx.__pendingTimerMs().length === 1 && ctx.__pendingTimerMs()[0] === 1000,
+      'hanya satu timer 1000ms yang berjalan');
+  });
+
   await test('bunyi: default ON, bisa dimatikan + tersimpan', async () => {
     const ctx = freshScannerCtx({ karyawan: [emp('K0001', 'Reza Kurnia')] });
     assert(ctx.__Scanner.isSoundEnabled() === true, 'default bunyi harus ON');
@@ -832,6 +881,62 @@ async function main() {
     await new Promise((r) => setTimeout(r, 10));
     assert(scannerStub.stopCalls === 0 && scannerStub.startCalls === 0,
       'scanner mati tidak boleh di-restart');
+  });
+
+  console.log('== pivot dashboard = layar scan (file statis + utils asli) ==');
+
+  await test('index.html: ada jam topbar + gate layer; tanpa tombol Mulai/Stop/Buka Halaman Scan', async () => {
+    const html = read('index.html');
+    assertHas(html, 'id="dashClockTime"');
+    assertHas(html, 'id="dashClockDate"');
+    assertHas(html, 'id="gateLayer"');
+    assertHas(html, 'css/style.css?v=dashscan1');
+    assert(!html.includes('data-scan-start'), 'tidak boleh ada tombol Mulai Scan');
+    assert(!html.includes('data-scan-stop'), 'tidak boleh ada tombol Stop');
+    assert(!html.includes('btnOpenScanPage'), 'tidak boleh ada tombol Buka Halaman Scan');
+    assert(!html.includes('Mulai Scan'), 'teks "Mulai Scan" tidak boleh tersisa');
+    assert(!html.includes('scan.html'), 'tidak boleh ada referensi scan.html');
+  });
+
+  await test('scan.html + js/scan-page.js sudah dihapus', async () => {
+    assert(!fs.existsSync(path.join(ROOT, 'scan.html')), 'scan.html harus sudah dihapus');
+    assert(!fs.existsSync(path.join(ROOT, 'js/scan-page.js')), 'js/scan-page.js harus sudah dihapus');
+  });
+
+  await test('main.js: auto-start kamera saat dashboard aktif; tanpa binding Start/Stop/Buka Halaman Scan', async () => {
+    const src = read('js/main.js');
+    assertHas(src, "if (tab === 'dashboard')");
+    assertHas(src, 'Scanner.start()');
+    assertHas(src, 'initDashClock');
+    assertHas(src, 'tickDashClock');
+    assert(!src.includes('data-scan-start'), 'binding Mulai Scan harus dihapus');
+    assert(!src.includes('data-scan-stop'), 'binding Stop harus dihapus');
+    assert(!src.includes('btnOpenScanPage'), 'handler Buka Halaman Scan harus dihapus');
+    assert(!src.includes('scan.html'), 'tidak boleh ada referensi scan.html');
+  });
+
+  await test('css: aturan gate + jam topbar ada; tidak ada sisa CSS scan-page', async () => {
+    const css = read('css/style.css');
+    assertHas(css, '.gate-layer');
+    assertHas(css, '.gate-layer.gate-ok');
+    assertHas(css, '.gate-layer.gate-err');
+    assertHas(css, '.topbar-clock-time');
+    assert(!css.includes('body.scan-page'), 'CSS scan-page harus sudah dihapus');
+    assert(!css.includes('scan-page-clock'), 'CSS jam scan-page harus sudah dihapus');
+  });
+
+  await test('utils: formatJam + formatTanggalID (kode asli)', async () => {
+    const sandbox = { console, localStorage: makeLocalStorage() };
+    vm.createContext(sandbox);
+    vm.runInContext(read('js/utils.js'), sandbox, { filename: 'utils.js' });
+    vm.runInContext('globalThis.__Utils = Utils;', sandbox);
+    const U = sandbox.__Utils;
+    assert(U.formatJam(new Date(2026, 10, 16, 9, 1, 49)) === '09:01:49', 'formatJam harus 09:01:49');
+    assert(U.formatJam(new Date(2026, 10, 16, 0, 0, 5)) === '00:00:05', 'formatJam harus 00:00:05');
+    assert(U.formatTanggalID(new Date(2026, 10, 16)) === 'Senin, 16 November 2026',
+      'formatTanggalID harus "Senin, 16 November 2026"');
+    assert(U.formatTanggalID(new Date(2026, 0, 1)) === 'Kamis, 1 Januari 2026',
+      'formatTanggalID harus "Kamis, 1 Januari 2026"');
   });
 
   console.log('\n' + passed + ' lulus, ' + failed + ' gagal');

@@ -121,7 +121,16 @@
 
     if (TAB_RENDER[tab]) TAB_RENDER[tab]();
 
-    if (tab !== 'dashboard') Scanner.stop();
+    if (tab === 'dashboard') {
+      // Dashboard = layar scan: kamera auto-start saat dashboard
+      // terbuka setelah login (NOL aksi). Berhenti saat pindah tab.
+      if (typeof Scanner !== 'undefined' && Scanner.start &&
+          typeof Scanner.isActive === 'function' && !Scanner.isActive()) {
+        Scanner.start().catch(() => {});
+      }
+    } else {
+      Scanner.stop();
+    }
 
     saveActiveTab(tab);
   }
@@ -173,13 +182,27 @@
       if (typeof Kiosk !== 'undefined') Kiosk.toggle();
     });
 
-    // Buka halaman scan khusus (scan.html) dengan mode yang sedang aktif
-    // di dashboard — halaman scan untuk PC standby di pintu/kantin.
-    document.getElementById('btnOpenScanPage')?.addEventListener('click', () => {
-      const mode = (typeof Scanner !== 'undefined' && Scanner.getMode) ? Scanner.getMode() : 'presensi';
-      window.open('scan.html?mode=' + encodeURIComponent(mode), '_blank');
-    });
     try { if (typeof Kiosk !== 'undefined') Kiosk.init(); } catch { /* abaikan */ }
+  }
+
+  // Jam realtime besar di topbar (HH:MM:SS + tanggal Indonesia,
+  // mengikuti jam simulasi bila aktif — Utils.now()). Berdetak tiap detik.
+  let dashClockStarted = false;
+  function tickDashClock() {
+    const t = document.getElementById('dashClockTime');
+    const d = document.getElementById('dashClockDate');
+    if (!t && !d) return;
+    let now;
+    try { now = (typeof Utils !== 'undefined' && Utils.now) ? Utils.now() : new Date(); }
+    catch { now = new Date(); }
+    if (t) t.textContent = (typeof Utils !== 'undefined' && Utils.formatJam) ? Utils.formatJam(now) : '--:--:--';
+    if (d) d.textContent = (typeof Utils !== 'undefined' && Utils.formatTanggalID) ? Utils.formatTanggalID(now) : '';
+  }
+  function initDashClock() {
+    if (dashClockStarted) return;
+    dashClockStarted = true;
+    tickDashClock();
+    setInterval(tickDashClock, 1000);
   }
 
   function initSidebarToggle() {
@@ -383,9 +406,9 @@
     document.getElementById('formUser')?.addEventListener('submit', (e) => User.save(e));
     document.getElementById('btnHapusUser')?.addEventListener('click', () => User.hapus());
 
-    // Scanner
-    document.querySelectorAll('[data-scan-start]').forEach((btn) => btn.addEventListener('click', () => Scanner.start()));
-    document.querySelectorAll('[data-scan-stop]').forEach((btn) => btn.addEventListener('click', () => Scanner.stop()));
+    // Scanner: mode diatur sekali per device lewat tombol mode di hero.
+    // Kamera auto-start saat dashboard aktif (activateTab) — tanpa
+    // tombol Mulai Scan / Stop (prinsip NOL aksi, dashboard = layar scan).
     document.querySelectorAll('[data-scan-mode]').forEach((btn) => btn.addEventListener('click', () => Scanner.setMode(btn.dataset.scanMode)));
 
     // Logout
@@ -516,6 +539,7 @@
     bindLoginForm();
     initSidebarToggle();
     initScanToggles();
+    initDashClock();
     try { if (typeof Simulator !== 'undefined') Simulator.init(); } catch { /* ignore */ }
 
     if (Auth.isLoggedIn()) {

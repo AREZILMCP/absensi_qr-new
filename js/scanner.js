@@ -34,8 +34,8 @@ const Scanner = (() => {
   let audioCtx = null;
 
   // Mode scan: 'presensi' (pintu masuk) atau 'kantin' (ruang makan).
-  // Default presensi; diganti lewat tombol mode di hero dashboard,
-  // atau dikunci lewat URL di halaman scan (scan.html?mode=kantin).
+  // Default presensi; diganti lewat tombol mode di hero dashboard
+  // (diatur sekali per device — dashboard yang jadi layar scan).
   let mode = 'presensi';
 
   const MODE_TEXT = {
@@ -544,6 +544,20 @@ const Scanner = (() => {
     showOverlay(item);
   }
 
+  // Lampu gate dashboard: layer warna memenuhi layar (tanpa teks),
+  // tersinkron dengan overlay hero — hijau sukses, merah gagal,
+  // kuning peringatan. Tampil 1 detik bersama overlay, lalu hilang.
+  function syncGate(type) {
+    const g = document.getElementById('gateLayer');
+    if (!g) return;
+    g.className = 'gate-layer show gate-' + type;
+  }
+  function hideGate() {
+    const g = document.getElementById('gateLayer');
+    if (!g) return;
+    g.className = 'gate-layer';
+  }
+
   function showOverlay(item) {
     const el = document.getElementById(RESULT_ID);
     if (!el) return;
@@ -551,6 +565,7 @@ const Scanner = (() => {
     el.innerHTML = item.html;
     el.className = 'result show scan-overlay scan-overlay-' + item.type;
     beep(item.type);
+    syncGate(item.type);
     if (resultHook) {
       try { resultHook(item); } catch { /* abaikan */ }
     }
@@ -568,6 +583,7 @@ const Scanner = (() => {
   function clearResult() {
     const el = document.getElementById(RESULT_ID);
     resultTimer = null;
+    hideGate();
     if (el) {
       el.className = 'result scan-overlay';
       el.innerHTML = '';
@@ -601,7 +617,7 @@ const Scanner = (() => {
     dismissResult,
     setSoundEnabled,
     isSoundEnabled: () => soundEnabled,
-    // Hook hasil scan (dipakai halaman scan untuk baris "Terakhir").
+    // Hook hasil scan (dipakai untuk baris "Terakhir"; dashboard memakai riwayat scan).
     setResultHook: (fn) => { resultHook = typeof fn === 'function' ? fn : null; },
   };
 })();

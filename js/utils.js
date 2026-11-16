@@ -21,6 +21,24 @@ const Utils = (() => {
     return Number.isNaN(d.getTime()) ? '-' : d.toLocaleString('id-ID');
   }
 
+  // Jam realtime HH:MM:SS (untuk jam besar di topbar dashboard).
+  function formatJam(d) {
+    const t = (d && typeof d.getHours === 'function') ? d : now();
+    if (Number.isNaN(t.getTime())) return '--:--:--';
+    const p = (n) => String(n).padStart(2, '0');
+    return p(t.getHours()) + ':' + p(t.getMinutes()) + ':' + p(t.getSeconds());
+  }
+
+  // Tanggal Indonesia "Senin, 16 November 2026" (tanpa dependensi ICU —
+  // nama hari/bulan ditulis manual supaya hasilnya deterministik).
+  const HARI_ID = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  const BULAN_ID = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  function formatTanggalID(d) {
+    const t = (d && typeof d.getHours === 'function') ? d : now();
+    if (Number.isNaN(t.getTime())) return '';
+    return HARI_ID[t.getDay()] + ', ' + t.getDate() + ' ' + BULAN_ID[t.getMonth()] + ' ' + t.getFullYear();
+  }
+
   /* ------------------------------------------------------------
      [3] CEK TANGGAL — apakah value jatuh di HARI INI
      ------------------------------------------------------------ */
@@ -488,6 +506,8 @@ const Utils = (() => {
   return {
     escapeHtml,
     formatWaktu,
+    formatJam,
+    formatTanggalID,
     now,
     nowMs,
     nowIso,
