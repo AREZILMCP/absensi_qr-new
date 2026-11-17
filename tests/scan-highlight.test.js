@@ -944,7 +944,7 @@ async function main() {
     assertHas(html, 'id="gateLayer"');
     assertHas(html, 'id="btnToggleCamera"');
     assertHas(html, 'Nyalakan Kamera');
-    assertHas(html, 'css/style.css?v=layoutfix1');
+    assertHas(html, 'css/style.css?v=overlayfull1');
     assert(!html.includes('data-scan-start'), 'tidak boleh ada tombol Mulai Scan');
     assert(!html.includes('data-scan-stop'), 'tidak boleh ada tombol Stop');
     assert(!html.includes('btnOpenScanPage'), 'tidak boleh ada tombol Buka Halaman Scan');
@@ -998,30 +998,37 @@ async function main() {
     // Tombol kamera lebar auto (bukan full-width), kotak Terakhir lebih sempit
     assertHas(css, '.hero-side #btnToggleCamera {\n  width: auto;\n  min-width: 220px;\n}');
     assertHas(css, '.hero-side .scan-last {\n  max-width: 720px;\n}');
+    // Overlay FULLSCREEN (bukan hanya pita hero): teks hasil scan
+    // terpusat di tengah viewport, bukan di atas layar saja
+    assertHas(css, '.scan-overlay {\n  /* FULLSCREEN: hasil scan terpusat di tengah layar (bukan hanya pita\n     hero) — gate layer (fixed) memenuhi layar, overlay pun harus\n     begitu, kalau tidak 2/3 bawah layar hanya warna kosong. */\n  position: fixed;\n  inset: 0;');
+    assertHas(css, 'min-height: 0;\n  border-radius: 0;\n}');
     // Overlay terpusat sebagai grup: info tidak flex:1, lebar maks dibatasi
     assertHas(css, '.scan-overlay-info { flex: 0 1 auto; max-width: min(880px, 72%); min-width: 0; text-align: center; }');
-    // Ukuran teks besar dari 346bb32 dipertahankan
-    assertHas(css, '.scan-overlay-headline {\n  font-size: clamp(1.5rem, 3vw, 2.2rem);');
-    assertHas(css, '.scan-overlay-name {\n  font-size: clamp(2.5rem, 5vw, 3.75rem);');
-    // Gate di atas FAB (4000), overlay hero di atas gate, modal tetap paling atas
+    // Ukuran teks besar (naik lagi karena overlay kini fullscreen)
+    assertHas(css, '.scan-overlay-headline {\n  font-size: clamp(1.5rem, 3vw, 2.4rem);');
+    assertHas(css, '.scan-overlay-name {\n  font-size: clamp(2.5rem, 5vw, 4.5rem);');
+    // Gate di bawah overlay (4500), overlay fullscreen di atas gate, modal tetap paling atas
     assertHas(css, 'z-index: 4500;');
     assertHas(css, 'z-index: 4600;');
     assertHas(css, 'z-index: 5000;');
   });
 
-  await test('css: overlay hasil scan besar + terpusat (headline/nama/kode kupon, ikon & foto 88px)', async () => {
+  await test('css: overlay hasil scan fullscreen, besar + terpusat (headline/nama/kode kupon, ikon & foto 88px)', async () => {
     const css = read('css/style.css');
+    // Fullscreen: overlay menutupi viewport (bukan hanya hero), konten terpusat di tengah layar
+    assertHas(css, '.scan-overlay {\n  /* FULLSCREEN: hasil scan terpusat di tengah layar (bukan hanya pita\n     hero) — gate layer (fixed) memenuhi layar, overlay pun harus\n     begitu, kalau tidak 2/3 bawah layar hanya warna kosong. */\n  position: fixed;\n  inset: 0;');
+    assertHas(css, 'min-height: 0;\n  border-radius: 0;\n}');
     // Terpusat: baris overlay justify-content center, blok info text-align center, kupon terpusat
     assertHas(css, 'align-items: center;\n  justify-content: center;\n  gap: 18px;');
     assertHas(css, '.scan-overlay-info { flex: 0 1 auto; max-width: min(880px, 72%); min-width: 0; text-align: center; }');
     assertHas(css, 'align-items: baseline; justify-content: center; gap: 10px;');
-    // Lebih besar (tetap muat di hero ~339px)
-    assertHas(css, '.scan-overlay-headline {\n  font-size: clamp(1.5rem, 3vw, 2.2rem);');
-    assertHas(css, '.scan-overlay-name {\n  font-size: clamp(2.5rem, 5vw, 3.75rem);');
+    // Lebih besar lagi (overlay kini fullscreen, bukan pita hero ~339px)
+    assertHas(css, '.scan-overlay-headline {\n  font-size: clamp(1.5rem, 3vw, 2.4rem);');
+    assertHas(css, '.scan-overlay-name {\n  font-size: clamp(2.5rem, 5vw, 4.5rem);');
     assertHas(css, '.scan-overlay-meta { font-size: 1rem; opacity: 0.85; }');
-    assertHas(css, '.scan-overlay-detail { font-size: clamp(1.05rem, 1.6vw, 1.35rem); margin-top: 2px; }');
+    assertHas(css, '.scan-overlay-detail { font-size: clamp(1.05rem, 1.6vw, 1.5rem); margin-top: 2px; }');
     assertHas(css, '.scan-overlay-kupon-lbl { font-size: 0.9rem;');
-    assertHas(css, '.scan-overlay-kupon-kode { font-size: clamp(1.8rem, 3.4vw, 2.6rem);');
+    assertHas(css, '.scan-overlay-kupon-kode { font-size: clamp(1.8rem, 3.4vw, 2.8rem);');
     // Ikon & foto 88px (bukan 72px lagi)
     assertHas(css, 'width: 88px;\n  height: 88px;\n  border-radius: 50%;\n  background: rgba(255, 255, 255, 0.18);');
     assertHas(css, 'font-size: 3rem;\n  font-weight: 700;\n  line-height: 1;');

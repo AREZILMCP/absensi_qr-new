@@ -1702,7 +1702,10 @@ input.input-error:focus {
    overlay solid (bukan kartu kecil di kolom kanan) supaya terbaca
    dari jarak 2-3 meter. Warna + ikon + kata, bukan warna saja. */
 .scan-overlay {
-  position: absolute;
+  /* FULLSCREEN: hasil scan terpusat di tengah layar (bukan hanya pita
+     hero) — gate layer (fixed) memenuhi layar, overlay pun harus
+     begitu, kalau tidak 2/3 bawah layar hanya warna kosong. */
+  position: fixed;
   inset: 0;
   /* Di atas gate layer (4500) supaya teks hasil scan tetap terlihat
      saat flash gate; di bawah modal (5000). */
@@ -1710,7 +1713,7 @@ input.input-error:focus {
   display: none;
   margin: 0;
   min-height: 0;
-  border-radius: 10px;
+  border-radius: 0;
 }
 
 .scan-overlay.show { display: flex; }
@@ -1750,13 +1753,13 @@ input.input-error:focus {
 .scan-overlay-info { flex: 0 1 auto; max-width: min(880px, 72%); min-width: 0; text-align: center; }
 
 .scan-overlay-headline {
-  font-size: clamp(1.5rem, 3vw, 2.2rem);
+  font-size: clamp(1.5rem, 3vw, 2.4rem);
   font-weight: 800;
   letter-spacing: 0.4px;
 }
 
 .scan-overlay-name {
-  font-size: clamp(2.5rem, 5vw, 3.75rem);
+  font-size: clamp(2.5rem, 5vw, 4.5rem);
   font-weight: 800;
   line-height: 1.05;
   white-space: nowrap;
@@ -1765,11 +1768,11 @@ input.input-error:focus {
 }
 
 .scan-overlay-meta { font-size: 1rem; opacity: 0.85; }
-.scan-overlay-detail { font-size: clamp(1.05rem, 1.6vw, 1.35rem); margin-top: 2px; }
+.scan-overlay-detail { font-size: clamp(1.05rem, 1.6vw, 1.5rem); margin-top: 2px; }
 
 .scan-overlay-kupon { margin-top: 6px; display: flex; align-items: baseline; justify-content: center; gap: 10px; }
 .scan-overlay-kupon-lbl { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.85; }
-.scan-overlay-kupon-kode { font-size: clamp(1.8rem, 3.4vw, 2.6rem); font-weight: 800; letter-spacing: 1px; }
+.scan-overlay-kupon-kode { font-size: clamp(1.8rem, 3.4vw, 2.8rem); font-weight: 800; letter-spacing: 1px; }
 .scan-overlay-note { font-size: 0.85rem; opacity: 0.9; margin-top: 2px; }
 
 .scan-overlay-photo {
