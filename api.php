@@ -638,7 +638,7 @@ function handleScan(PDO $pdo): void {
   $menitMasukMax = 8 * 60;     // 08:00 tepat waktu
   $menitToleransi = 15;         // sampai 08:15 terlambat, lewat itu block
   $menitMakanMulai = 12 * 60;   // 12:00 jendela makan siang (inklusif)
-  $menitMakanAkhir = 13 * 60;   // 13:00 jendela makan siang (inklusif)
+  $menitMakanAkhir = 13 * 60;   // 13:00 batas akhir jendela (eksklusif: 13:00 sudah lewat jendela)
   $menitPulang = 16 * 60;       // 16:00 check-out; lewat itu lembur
   $menitLemburMakan = 120;      // ekstra makan bila lembur >= 120 mnt (>= 18:00)
 
@@ -679,14 +679,17 @@ function handleScan(PDO $pdo): void {
       // Kupon OTOMATIS terbit + ditebus dalam satu scan (model dinamis).
       // Kupon reservasi manual TIDAK disentuh di sini; jalurnya tetap
       // Release Reservasi.
-      $jamMakan = $menit >= $menitMakanMulai && $menit <= $menitMakanAkhir;
+      // Jendela makan siang 12:00 <= t < 13:00 (13:00 sudah lewat jendela).
+      $jamMakan = $menit >= $menitMakanMulai && $menit < $menitMakanAkhir;
       $jamEkstra = $menit >= $menitPulang + $menitLemburMakan; // >= 18:00
-      if (!$jamMakan && !$jamEkstra) {
-        $type = 'warn'; $aksi = 'tolak';
-        $message = 'Di luar jam makan — makan siang 12:00–13:00, ekstra makan ≥18:00';
-      } elseif (!$absenToday) {
+      // Syarat dulu: makan butuh check-in hari ini (berlaku di semua jam).
+      if (!$absenToday) {
         $type = 'warn'; $aksi = 'tolak';
         $message = 'Belum absen masuk — makan butuh absensi masuk hari ini';
+      } elseif ($menit < $menitMakanMulai) {
+        // Pagi: sebelum jendela makan siang.
+        $type = 'warn'; $aksi = 'tolak';
+        $message = 'Belum waktunya makan — makan siang 12:00–13:00';
       } elseif ($jamMakan) {
         if ($makanSiangToday) {
           $type = 'warn'; $aksi = 'tolak';
@@ -703,6 +706,19 @@ function handleScan(PDO $pdo): void {
           $type = 'ok'; $aksi = 'makan-siang'; $riwayatJenis = 'Makan Siang';
           $message = 'Makan siang berhasil — kupon otomatis terbit, silakan ambil makanan';
         }
+      } elseif ($menit < $menitPulang) {
+        // 13:00–16:00: jendela makan siang sudah lewat.
+        if ($makanSiangToday) {
+          $type = 'warn'; $aksi = 'tolak';
+          $message = 'Sudah ambil makan siang hari ini';
+        } else {
+          $type = 'warn'; $aksi = 'tolak';
+          $message = 'Sudah lewat jam makan siang — makan siang 12:00–13:00';
+        }
+      } elseif (!$jamEkstra) {
+        // 16:00–18:00: lembur, ekstra makan baru mulai 18:00.
+        $type = 'warn'; $aksi = 'tolak';
+        $message = 'Belum dapat ekstra makan — ekstra makan mulai 18:00';
       } else {
         // jamEkstra (>= 18:00) — karyawan MASIH KERJA: ekstra makan TIDAK
         // mensyaratkan sudah absen pulang. Lembur diukur dari jam saat ini.

@@ -277,6 +277,10 @@ const Dashboard = (() => {
      ------------------------------------------------------------ */
   const IC_CLOCK = '<svg class="ic-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
   const IC_ARROW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+  // Masuk vs pulang HARUS beda ikon: login (panah masuk ke dalam pintu)
+  // vs logout (panah keluar dari pintu) — gaya Feather, bukan emoji.
+  const IC_LOGIN = '<svg class="ic-login" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg>';
+  const IC_LOGOUT = '<svg class="ic-logout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>';
   const IC_FORK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>';
 
   // Jam HH:MM:SS dari string waktu riwayat ("17/11/2026, 07.56.28"
@@ -309,8 +313,8 @@ const Dashboard = (() => {
   // Badge berwarna per jenis riwayat (label + warna + ikon).
   function badgeJenis(jenis) {
     const map = {
-      'Absensi': { label: 'Absensi Masuk', cls: 'badge-green', icon: IC_ARROW },
-      'Absensi Pulang': { label: 'Absensi Pulang', cls: 'badge-gray', icon: IC_ARROW },
+      'Absensi': { label: 'Absensi Masuk', cls: 'badge-green', icon: IC_LOGIN },
+      'Absensi Pulang': { label: 'Absensi Pulang', cls: 'badge-gray', icon: IC_LOGOUT },
       'Makan Siang': { label: 'Makan Siang', cls: 'badge-blue', icon: IC_FORK },
       'Ekstra Makan': { label: 'Ekstra Makan', cls: 'badge-purple', icon: IC_FORK },
       'Kupon Makan': { label: 'Kupon Makan', cls: 'badge-blue', icon: IC_FORK },

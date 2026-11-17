@@ -129,7 +129,8 @@ const Utils = (() => {
      1-2-3-4): jam yang menentukan apa arti sebuah scan.
      - Check-in jam 08:00 pas; 08:01-08:15 terlambat (toleransi,
        tetap tercatat); lewat 08:15 check-in DI-BLOCK.
-     - Makan siang 12:00-13:00 (inklusif) di kantin; ekstra makan
+     - Makan siang 12:00-13:00 (13:00 sudah di luar jendela) di kantin;
+       ekstra makan
        bila lembur >= 120 menit (pulang >= 18:00).
      - Lembur dihitung mulai lewat 16:00 (pulang 17:00 = 1 jam).
      ------------------------------------------------------------ */
@@ -137,7 +138,7 @@ const Utils = (() => {
     MASUK: '08:00',              // jam masuk (non-shift, sesuai artikel B1)
     TOLERANSI_TERLAMBAT_MENIT: 15, // toleransi keterlambatan -> block setelah 08:15
     MAKAN_MULAI: '12:00',        // jendela makan siang (inklusif)
-    MAKAN_AKHIR: '13:00',        // jendela makan siang (inklusif)
+    MAKAN_AKHIR: '13:00',        // batas akhir jendela (eksklusif: 13:00 sudah lewat jendela)
     PULANG: '16:00',             // jam pulang (non-shift, sesuai artikel B1)
     LEMBUR_SETELAH_MENIT: 120,   // ekstra makan bila lembur >= 120 menit
   };
@@ -197,10 +198,11 @@ const Utils = (() => {
     return menitHariIni(d) > menitDariJam(WORK.MASUK) + WORK.TOLERANSI_TERLAMBAT_MENIT;
   }
 
-  // Jendela makan siang 12:00-13:00 (inklusif, presisi menit).
+  // Jendela makan siang 12:00-13:00 (13:00 sudah di luar jendela,
+  // presisi menit — sama dengan decideScan di js/scanner.js).
   function isJamMakan(d) {
     const m = menitHariIni(d);
-    return m >= menitDariJam(WORK.MAKAN_MULAI) && m <= menitDariJam(WORK.MAKAN_AKHIR);
+    return m >= menitDariJam(WORK.MAKAN_MULAI) && m < menitDariJam(WORK.MAKAN_AKHIR);
   }
 
   // Jendela ekstra makan: mulai 18:00 (lembur >= 120 menit).

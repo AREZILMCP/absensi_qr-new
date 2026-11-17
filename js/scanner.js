@@ -234,19 +234,33 @@ const Scanner = (() => {
     const LEMBUR_MAKAN = W.LEMBUR_SETELAH_MENIT != null ? W.LEMBUR_SETELAH_MENIT : 120;
 
     if (mode === 'kantin') {
-      const jamMakan = nowMin >= MAKAN_MULAI && nowMin <= MAKAN_AKHIR;
+      // Jendela makan siang 12:00 <= t < 13:00 (13:00 sudah lewat jendela).
+      const jamMakan = nowMin >= MAKAN_MULAI && nowMin < MAKAN_AKHIR;
       const jamEkstra = nowMin >= PULANG + LEMBUR_MAKAN; // >= 18:00
-      if (!jamMakan && !jamEkstra) {
-        return { type: 'warn', aksi: 'tolak', message: 'Di luar jam makan — makan siang 12:00–13:00, ekstra makan ≥18:00', lemburMenit: 0 };
-      }
+      // Syarat dulu: makan butuh check-in hari ini (berlaku di semua jam).
       if (!st.absenToday) {
         return { type: 'warn', aksi: 'tolak', message: 'Belum absen masuk — makan butuh absensi masuk hari ini', lemburMenit: 0 };
+      }
+      // Pagi: sebelum jendela makan siang — "belum waktunya" hanya benar di sini.
+      if (nowMin < MAKAN_MULAI) {
+        return { type: 'warn', aksi: 'tolak', message: 'Belum waktunya makan — makan siang 12:00–13:00', lemburMenit: 0 };
       }
       if (jamMakan) {
         if (st.makanSiangToday) {
           return { type: 'warn', aksi: 'tolak', message: 'Sudah ambil makan siang hari ini', lemburMenit: 0 };
         }
         return { type: 'ok', aksi: 'makan-siang', message: 'Makan siang berhasil — kupon otomatis terbit, silakan ambil makanan', lemburMenit: 0 };
+      }
+      if (nowMin < PULANG) {
+        // 13:00–16:00: jendela makan siang sudah lewat.
+        if (st.makanSiangToday) {
+          return { type: 'warn', aksi: 'tolak', message: 'Sudah ambil makan siang hari ini', lemburMenit: 0 };
+        }
+        return { type: 'warn', aksi: 'tolak', message: 'Sudah lewat jam makan siang — makan siang 12:00–13:00', lemburMenit: 0 };
+      }
+      if (!jamEkstra) {
+        // 16:00–18:00: lembur, ekstra makan baru mulai 18:00.
+        return { type: 'warn', aksi: 'tolak', message: 'Belum dapat ekstra makan — ekstra makan mulai 18:00', lemburMenit: 0 };
       }
       // jamEkstra (>= 18:00) — karyawan MASIH KERJA: ekstra makan TIDAK
       // mensyaratkan sudah absen pulang (pulang adalah akhir hari kerja;
@@ -408,9 +422,11 @@ const Scanner = (() => {
     if (/Belum jam pulang/i.test(m)) return 'BELUM JAM PULANG';
     if (/Belum absen masuk/i.test(m)) return 'BELUM ABSEN MASUK';
     if (/Sudah absen pulang/i.test(m)) return 'SUDAH PULANG';
-    if (/Di luar jam makan/i.test(m)) return 'DI LUAR JAM MAKAN';
-    if (/Sudah ambil makan siang/i.test(m)) return 'SUDAH AMBIL MAKAN';
-    if (/Sudah ambil ekstra makan/i.test(m)) return 'SUDAH EKSTRA MAKAN';
+    if (/Sudah ambil makan siang/i.test(m)) return 'MAKAN SIANG SUDAH DIAMBIL';
+    if (/Sudah ambil ekstra makan/i.test(m)) return 'EKSTRA MAKAN SUDAH DIAMBIL';
+    if (/Sudah lewat jam makan siang/i.test(m)) return 'SUDAH LEWAT JAM MAKAN SIANG';
+    if (/Belum dapat ekstra makan/i.test(m)) return 'BELUM DAPAT EKSTRA MAKAN';
+    if (/Belum waktunya makan/i.test(m)) return 'BELUM WAKTUNYA MAKAN';
     if (/Ekstra makan berhasil/i.test(m)) return 'EKSTRA MAKAN';
     if (/Makan siang berhasil/i.test(m)) return 'MAKAN SIANG';
     if (/Absensi pulang/i.test(m)) return 'ABSENSI PULANG';
@@ -423,7 +439,10 @@ const Scanner = (() => {
   // perlu baca jam — jam ada di baris "Terakhir" + riwayat).
   // ABSENSI MASUK -> "Tepat waktu" / "Terlambat N menit".
   // ABSENSI PULANG -> "Lembur X" bila lembur, '' bila tidak (baris
-  // detail disembunyikan bila kosong). Headline lain -> jam.
+  // detail disembunyikan bila kosong).
+  // KANTIN sudah claim -> "Diambil HH:MM:SS" (jam pengambilan kupon)
+  // atau teks fallback; kantin di luar jendela -> info jendela makan.
+  // Headline lain -> jam.
   function detailFor(k, headline, message, timeStr) {
     if (headline === 'ABSENSI MASUK' && k.absenAt) {
       const d = new Date(k.absenAt);
@@ -442,7 +461,33 @@ const Scanner = (() => {
     if (headline === 'ABSENSI PULANG') {
       return '';
     }
+    // Kantin: detail sesuai headline baru (bukan jam saat ini — jam yang
+    // ditampilkan adalah jam PENGAMBILAN kupon, atau info jendela).
+    if (headline === 'MAKAN SIANG SUDAH DIAMBIL') {
+      return diambilJam(k, 'reguler') || 'Sudah ambil makan siang hari ini';
+    }
+    if (headline === 'EKSTRA MAKAN SUDAH DIAMBIL') {
+      return diambilJam(k, 'lembur') || 'Sudah ambil ekstra makan hari ini';
+    }
+    if (headline === 'SUDAH LEWAT JAM MAKAN SIANG' || headline === 'BELUM WAKTUNYA MAKAN') {
+      return 'Makan siang 12:00–13:00';
+    }
+    if (headline === 'BELUM DAPAT EKSTRA MAKAN') {
+      return 'Ekstra makan mulai 18:00';
+    }
     return timeStr || Utils.now().toLocaleTimeString('id-ID');
+  }
+
+  // Jam pengambilan kupon ("Diambil 12:00:03") dari k.makanAt hari ini;
+  // '' bila tidak tersedia (dipakai teks fallback oleh pemanggil).
+  function diambilJam(k, jenis) {
+    if (!k || !k.makanAt) return '';
+    if (typeof Utils !== 'undefined' && Utils.isToday && !Utils.isToday(k.makanAt)) return '';
+    if (jenis && k.kuponJenis && k.kuponJenis !== jenis) return '';
+    const d = new Date(k.makanAt);
+    if (Number.isNaN(d.getTime())) return '';
+    const p = (n) => String(n).padStart(2, '0');
+    return 'Diambil ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
   }
 
   // Kode kupon ditampilkan besar hanya saat makan siang / ekstra

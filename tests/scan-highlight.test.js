@@ -489,7 +489,7 @@ async function main() {
     assert(ctx.__state.riwayat[0].jenis === 'Makan Siang', 'riwayat Makan Siang tercatat');
   });
 
-  await test('kantin sudah makan: warn SUDAH AMBIL MAKAN', async () => {
+  await test('kantin sudah makan: warn MAKAN SIANG SUDAH DIAMBIL + Diambil 12:00:00', async () => {
     const ctx = freshScannerCtx({
       karyawan: [emp('K0001', 'Reza Kurnia', {
         absen: true, absenAt: '2026-11-16T08:05:00',
@@ -501,11 +501,12 @@ async function main() {
     ctx.__Scanner.setMode('kantin');
     const el = await startAndScan(ctx, 'K0001');
     assertHas(el.className, 'scan-overlay-warn');
-    assertHas(el.innerHTML, 'SUDAH AMBIL MAKAN');
+    assertHas(el.innerHTML, 'MAKAN SIANG SUDAH DIAMBIL');
+    assertHas(el.innerHTML, 'Diambil 12:00:00');
     assert(ctx.__state.audioOsc.length === 2, 'beep warn harus 2 nada');
   });
 
-  await test('kantin 11:59 (di luar jendela): warn DI LUAR JAM MAKAN', async () => {
+  await test('kantin 11:59 (pagi, sebelum jendela): warn BELUM WAKTUNYA MAKAN', async () => {
     const ctx = freshScannerCtx({
       karyawan: [emp('K0001', 'Reza Kurnia', { absen: true, absenAt: '2026-11-16T08:05:00' })],
     });
@@ -513,7 +514,7 @@ async function main() {
     ctx.__Scanner.setMode('kantin');
     const el = await startAndScan(ctx, 'K0001');
     assertHas(el.className, 'scan-overlay-warn');
-    assertHas(el.innerHTML, 'DI LUAR JAM MAKAN');
+    assertHas(el.innerHTML, 'BELUM WAKTUNYA MAKAN');
   });
 
   await test('kantin 18:05 ekstra makan (lembur 2 jam 5 mnt): EKSTRA MAKAN + kupon lembur', async () => {
@@ -979,6 +980,18 @@ async function main() {
     assertHas(html, 'Ekstra Makan');
     assertHas(html, 'jenis-badge badge-gray');
     assertHas(html, 'Absensi Pulang');
+    // Ikon masuk vs pulang HARUS berbeda: login (panah masuk ke dalam
+    // pintu) vs logout (panah keluar dari pintu) — bukan panah yang sama.
+    assertHas(html, 'ic-login');
+    assertHas(html, 'ic-logout');
+    const svgMasuk = html.slice(html.indexOf('jenis-badge badge-green'), html.indexOf('Absensi Masuk'));
+    const svgPulang = html.slice(html.indexOf('jenis-badge badge-gray'), html.indexOf('Absensi Pulang'));
+    assert(svgMasuk.includes('<svg') && svgPulang.includes('<svg'), 'badge masuk/pulang harus berisi SVG');
+    assert(svgMasuk !== svgPulang, 'ikon badge masuk dan pulang harus BERBEDA');
+    assert(svgMasuk.includes('ic-login') && svgPulang.includes('ic-logout'),
+      'masuk harus ic-login, pulang harus ic-logout');
+    // Ikon makan (garpu) tidak berubah.
+    assertHas(html, 'M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2');
   });
 
   console.log('== kiosk.js — Mode Kiosk-lite (kamera dulu, baru fullscreen) ==');

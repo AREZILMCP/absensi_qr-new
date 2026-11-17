@@ -3,10 +3,13 @@
    Menguji KODE ASLI js/scanner.js lewat vm dengan stub DOM/Utils/
    Storage/fetch — tanpa browser dan tanpa kamera.
    Batas yang diuji: check-in 07:55/08:00/08:01/08:15/08:16/08:30,
-   checkout 15:59/16:00/16:01/17:00/18:05, jendela kantin
-   11:59/12:00/12:30/13:00/13:01/17:30/17:59/18:00/18:05, lembur
-   119 vs 120 menit untuk ekstra makan (diukur dari jam saat ini), dan jalur server-first
-   (sukses / 401 / offline / respons invalid / Mode Demo / simulasi).
+   checkout 15:59/16:00/16:01/17:00/18:05, pita jam kantin
+   11:59/12:00/12:30/13:00/13:01/15:55/17:00/17:30/17:59/18:00/18:05/18:30
+   (copy per pita jam + status claim: sudah claim / lewat jendela /
+   belum dapat ekstra / belum waktunya), lembur 119 vs 120 menit untuk
+   ekstra makan (diukur dari jam saat ini), parity pesan decideScan (JS)
+   vs handleScan (PHP), dan jalur server-first (sukses / 401 / offline /
+   respons invalid / Mode Demo / simulasi).
    Jalankan: node tests/scan-dynamic.test.js */
 'use strict';
 
@@ -351,14 +354,17 @@ async function main() {
 
   console.log('== kantin — jendela makan siang ==');
 
+  // Pita jam kantin (belum ambil makan siang): pagi = BELUM WAKTUNYA,
+  // 12:00–13:00 = MAKAN SIANG (13:00 sudah di luar jendela), 13:00–16:00
+  // = SUDAH LEWAT JAM MAKAN SIANG, 16:00–18:00 = BELUM DAPAT EKSTRA MAKAN.
   const batasMakan = [
-    [11, 59, 'DI LUAR JAM MAKAN'],
+    [11, 59, 'BELUM WAKTUNYA MAKAN'],
     [12, 0, 'MAKAN SIANG'],
     [12, 30, 'MAKAN SIANG'],
-    [13, 0, 'MAKAN SIANG'],
-    [13, 1, 'DI LUAR JAM MAKAN'],
-    [17, 30, 'DI LUAR JAM MAKAN'],
-    [17, 59, 'DI LUAR JAM MAKAN'],
+    [13, 0, 'SUDAH LEWAT JAM MAKAN SIANG'],
+    [13, 1, 'SUDAH LEWAT JAM MAKAN SIANG'],
+    [17, 30, 'BELUM DAPAT EKSTRA MAKAN'],
+    [17, 59, 'BELUM DAPAT EKSTRA MAKAN'],
   ];
   for (const [h, m, teks] of batasMakan) {
     await test(`kantin ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} -> ${teks}`, async () => {
@@ -392,12 +398,13 @@ async function main() {
     assert(ctx.__state.riwayat[0].jenis === 'Ekstra Makan', 'riwayat Ekstra Makan tercatat');
   });
 
-  await test('kantin 17:59 lembur 119 menit dari jam saat ini -> DI LUAR JAM MAKAN', async () => {
+  await test('kantin 17:59 lembur 119 menit dari jam saat ini -> BELUM DAPAT EKSTRA MAKAN', async () => {
     const ctx = freshScannerCtx({ karyawan: [sudahMasuk()] });
     ctx.__setNow(17, 59);
     ctx.__Scanner.setMode('kantin');
     const el = await startAndScan(ctx, 'K0001');
-    assertHas(el.innerHTML, 'DI LUAR JAM MAKAN');
+    assertHas(el.innerHTML, 'BELUM DAPAT EKSTRA MAKAN');
+    assertHas(el.innerHTML, 'Ekstra makan mulai 18:00');
     assert(ctx.__state.karyawan[0].makan === false, 'makan tidak boleh tercatat');
   });
 
@@ -421,7 +428,7 @@ async function main() {
     assert(ctx.__state.karyawan[0].kuponJenis === 'lembur', 'kupon harus jenis lembur');
   });
 
-  await test('kantin 18:30 sudah ekstra makan -> SUDAH EKSTRA MAKAN', async () => {
+  await test('kantin 18:30 sudah ekstra makan -> EKSTRA MAKAN SUDAH DIAMBIL + Diambil 18:05:00', async () => {
     const ctx = freshScannerCtx({
       karyawan: [sudahMakan({
         makan: true, makanAt: '2026-11-16T18:05:00',
@@ -431,12 +438,80 @@ async function main() {
     ctx.__setNow(18, 30);
     ctx.__Scanner.setMode('kantin');
     const el = await startAndScan(ctx, 'K0001');
-    assertHas(el.innerHTML, 'SUDAH EKSTRA MAKAN');
+    assertHas(el.innerHTML, 'EKSTRA MAKAN SUDAH DIAMBIL');
+    assertHas(el.innerHTML, 'Diambil 18:05:00');
   });
 
   await test('kantin 18:30 belum check-in -> BELUM ABSEN MASUK', async () => {
     const ctx = freshScannerCtx({ karyawan: [emp('K0001', 'Reza Kurnia')] });
     ctx.__setNow(18, 30);
+    ctx.__Scanner.setMode('kantin');
+    const el = await startAndScan(ctx, 'K0001');
+    assertHas(el.innerHTML, 'BELUM ABSEN MASUK');
+  });
+
+  console.log('== kantin — copy per pita jam + status claim (cross-check tabel) ==');
+
+  await test('(a) kasus user: sudah ambil makan siang + kantin 15:55 -> MAKAN SIANG SUDAH DIAMBIL + Diambil 12:00:00', async () => {
+    const ctx = freshScannerCtx({ karyawan: [sudahMakan()] });
+    ctx.__setNow(15, 55);
+    ctx.__Scanner.setMode('kantin');
+    const el = await startAndScan(ctx, 'K0001');
+    assertHas(el.innerHTML, 'MAKAN SIANG SUDAH DIAMBIL');
+    assertHas(el.innerHTML, 'Diambil 12:00:00');
+    assert(ctx.__state.riwayat.length === 0, 'tolak tidak boleh menambah riwayat');
+  });
+
+  await test('(b) belum ambil makan siang + kantin 15:55 -> SUDAH LEWAT JAM MAKAN SIANG', async () => {
+    const ctx = freshScannerCtx({ karyawan: [sudahMasuk()] });
+    ctx.__setNow(15, 55);
+    ctx.__Scanner.setMode('kantin');
+    const el = await startAndScan(ctx, 'K0001');
+    assertHas(el.innerHTML, 'SUDAH LEWAT JAM MAKAN SIANG');
+    assertHas(el.innerHTML, 'Makan siang 12:00–13:00');
+    assert(ctx.__state.karyawan[0].makan === false, 'makan tidak boleh tercatat');
+  });
+
+  await test('(c) kantin 17:00 sudah ambil makan siang -> BELUM DAPAT EKSTRA MAKAN (bukan SUDAH DIAMBIL)', async () => {
+    const ctx = freshScannerCtx({ karyawan: [sudahMakan()] });
+    ctx.__setNow(17, 0);
+    ctx.__Scanner.setMode('kantin');
+    const el = await startAndScan(ctx, 'K0001');
+    assertHas(el.innerHTML, 'BELUM DAPAT EKSTRA MAKAN');
+    assertHas(el.innerHTML, 'Ekstra makan mulai 18:00');
+    assert(ctx.__state.riwayat.length === 0, 'tolak tidak boleh menambah riwayat');
+  });
+
+  await test('(e) kantin 12:30 sudah ambil makan siang -> MAKAN SIANG SUDAH DIAMBIL + Diambil 12:00:00', async () => {
+    const ctx = freshScannerCtx({ karyawan: [sudahMakan()] });
+    ctx.__setNow(12, 30);
+    ctx.__Scanner.setMode('kantin');
+    const el = await startAndScan(ctx, 'K0001');
+    assertHas(el.innerHTML, 'MAKAN SIANG SUDAH DIAMBIL');
+    assertHas(el.innerHTML, 'Diambil 12:00:00');
+  });
+
+  await test('(f) kantin 08:00 (pagi, sudah check-in) -> BELUM WAKTUNYA MAKAN', async () => {
+    const ctx = freshScannerCtx({ karyawan: [sudahMasuk()] });
+    ctx.__setNow(8, 0);
+    ctx.__Scanner.setMode('kantin');
+    const el = await startAndScan(ctx, 'K0001');
+    assertHas(el.innerHTML, 'BELUM WAKTUNYA MAKAN');
+    assertHas(el.innerHTML, 'Makan siang 12:00–13:00');
+    assert(ctx.__state.karyawan[0].makan === false, 'makan tidak boleh tercatat');
+  });
+
+  await test('kantin 15:55 belum check-in -> BELUM ABSEN MASUK (syarat check-in didahulukan)', async () => {
+    const ctx = freshScannerCtx({ karyawan: [emp('K0001', 'Reza Kurnia')] });
+    ctx.__setNow(15, 55);
+    ctx.__Scanner.setMode('kantin');
+    const el = await startAndScan(ctx, 'K0001');
+    assertHas(el.innerHTML, 'BELUM ABSEN MASUK');
+  });
+
+  await test('kantin 08:00 belum check-in -> BELUM ABSEN MASUK (bukan BELUM WAKTUNYA MAKAN)', async () => {
+    const ctx = freshScannerCtx({ karyawan: [emp('K0001', 'Reza Kurnia')] });
+    ctx.__setNow(8, 0);
     ctx.__Scanner.setMode('kantin');
     const el = await startAndScan(ctx, 'K0001');
     assertHas(el.innerHTML, 'BELUM ABSEN MASUK');
@@ -570,6 +645,36 @@ async function main() {
     const el = await startAndScan(ctx, 'K0001');
     assert(ctx.__state.fetchCalls.length === 0, 'simulasi tidak boleh fetch');
     assertHas(el.innerHTML, 'ABSENSI MASUK');
+  });
+
+  console.log('== parity pesan decideScan (JS) vs handleScan (PHP) ==');
+
+  await test('parity: semua pesan keputusan ada di scanner.js DAN api.php; "Di luar jam makan" sudah hilang', async () => {
+    const jsSrc = read('js/scanner.js');
+    const phpSrc = read('api.php');
+    const pesan = [
+      'Check-in ditutup — terlambat melewati 08:15',
+      'Absensi masuk berhasil dicatat',
+      'Belum jam pulang — check-out mulai 16:00',
+      'Belum absen masuk hari ini',
+      'Sudah absen pulang hari ini',
+      'Absensi pulang dicatat — Lembur ',
+      'Absensi pulang berhasil dicatat',
+      'Belum absen masuk — makan butuh absensi masuk hari ini',
+      'Belum waktunya makan — makan siang 12:00–13:00',
+      'Sudah ambil makan siang hari ini',
+      'Makan siang berhasil — kupon otomatis terbit, silakan ambil makanan',
+      'Sudah lewat jam makan siang — makan siang 12:00–13:00',
+      'Belum dapat ekstra makan — ekstra makan mulai 18:00',
+      'Sudah ambil ekstra makan hari ini',
+      'Ekstra makan berhasil — kupon lembur otomatis terbit, silakan ambil makanan',
+    ];
+    for (const p of pesan) {
+      assert(jsSrc.includes("'" + p + "'"), 'scanner.js harus berisi pesan: ' + p);
+      assert(phpSrc.includes("'" + p + "'"), 'api.php harus berisi pesan: ' + p);
+    }
+    assert(!jsSrc.includes('Di luar jam makan'), 'scanner.js tidak boleh lagi berisi "Di luar jam makan"');
+    assert(!phpSrc.includes('Di luar jam makan'), 'api.php tidak boleh lagi berisi "Di luar jam makan"');
   });
 
   console.log('\n' + passed + ' lulus, ' + failed + ' gagal');
