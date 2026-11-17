@@ -278,6 +278,71 @@
     try { if (typeof Kiosk !== 'undefined') Kiosk.init(); } catch { /* abaikan */ }
   }
 
+  // Menu gear topbar (HANYA tampil di mobile <=768px — CSS): baris
+  // kedua topbar jadi lega, tombol aksi (Suara / Mode Kiosk / Keluar)
+  // bersembunyi di balik dropdown. Jam HH:MM:SS + badge MODE DEMO
+  // tetap terlihat di baris kedua (status, bukan aksi). Item dropdown
+  // memanggil handler yang SAMA dengan tombol desktop (dispatch
+  // .click() ke btnSoundToggle / btnKioskToggle / btnLogout), jadi
+  // tidak ada duplikasi logika suara/kiosk/logout.
+  function initTopbarMenu() {
+    const wrap = document.querySelector('.topbar-menu-wrap');
+    const btn = document.getElementById('btnTopbarMenu');
+    const menu = document.getElementById('topbarMenu');
+    if (!wrap || !btn || !menu) return;
+    const soundItem = document.getElementById('topbarMenuSound');
+    const soundLabel = soundItem ? soundItem.querySelector('.topbar-menu-item-label') : null;
+
+    const isOpen = () => wrap.classList.contains('open');
+    // Label item Suara mengikuti state yang sama dengan tombol desktop.
+    const syncSoundItem = () => {
+      if (!soundItem || typeof Scanner === 'undefined') return;
+      const on = Scanner.isSoundEnabled();
+      soundItem.setAttribute('aria-pressed', String(on));
+      if (soundLabel) soundLabel.textContent = on ? 'Suara: Nyala' : 'Suara: Mati';
+    };
+    const closeMenu = () => {
+      wrap.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
+    };
+    const openMenu = () => {
+      syncSoundItem();
+      wrap.classList.add('open');
+      btn.setAttribute('aria-expanded', 'true');
+    };
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (isOpen()) closeMenu(); else openMenu();
+    });
+    // Ketuk di luar dropdown menutupnya (listener document terpisah
+    // dari penutup submenu nav yang memakai .nav-group).
+    document.addEventListener('click', (e) => {
+      if (isOpen() && !e.target.closest('.topbar-menu-wrap')) closeMenu();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && isOpen()) closeMenu();
+    });
+
+    // Suara: toggle lewat tombol desktop yang sama, label diperbarui,
+    // dropdown TETAP terbuka supaya user melihat perubahan statusnya.
+    document.getElementById('topbarMenuSound')?.addEventListener('click', () => {
+      document.getElementById('btnSoundToggle')?.click();
+      syncSoundItem();
+    });
+    // Kiosk & Keluar: jalankan aksi yang sama, lalu tutup dropdown.
+    document.getElementById('topbarMenuKiosk')?.addEventListener('click', () => {
+      closeMenu();
+      document.getElementById('btnKioskToggle')?.click();
+    });
+    document.getElementById('topbarMenuLogout')?.addEventListener('click', () => {
+      closeMenu();
+      document.getElementById('btnLogout')?.click();
+    });
+
+    syncSoundItem();
+  }
+
   // Jam realtime besar di topbar (HH:MM:SS + tanggal Indonesia,
   // mengikuti jam simulasi bila aktif — Utils.now()). Berdetak tiap detik.
   let dashClockStarted = false;
@@ -662,6 +727,7 @@
     bindLoginForm();
     initSidebarToggle();
     initScanToggles();
+    initTopbarMenu();
     initDashClock();
     initScanLast();
     initCameraToggle();

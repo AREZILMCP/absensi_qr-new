@@ -19,6 +19,10 @@
    tetap terlihat, subjudul + tanggal disembunyikan, kiosk & Keluar
    icon-only) supaya tidak meluap di ~390px; drawer sidebar sudah ada
    (hamburger topbar + backdrop + tombol tutup + Esc).
+   Menu gear topbar mobile (17 Nov 2026): di <=768px tombol aksi
+   (Suara / Mode Kiosk / Keluar) bersembunyi di balik satu ikon gear
+   yang membuka dropdown berlabel; jam + badge MODE DEMO tetap
+   terlihat; desktop tidak berubah (tombol tetap berderet).
    Yang TIDAK diuji di sini (butuh browser + kamera asli): alur scan
    end-to-end lewat kamera sungguhan.
    Jalankan: node tests/scan-highlight.test.js */
@@ -1155,7 +1159,7 @@ async function main() {
     assertHas(html, 'id="gateLayer"');
     assertHas(html, 'id="btnToggleCamera"');
     assertHas(html, 'Nyalakan Kamera');
-    assertHas(html, 'css/style.css?v=mobile1');
+    assertHas(html, 'css/style.css?v=topbarmenu1');
     assert(!html.includes('data-scan-start'), 'tidak boleh ada tombol Mulai Scan');
     assert(!html.includes('data-scan-stop'), 'tidak boleh ada tombol Stop');
     assert(!html.includes('btnOpenScanPage'), 'tidak boleh ada tombol Buka Halaman Scan');
@@ -1317,7 +1321,57 @@ async function main() {
     // Padding bawah konten supaya kartu terakhir bisa di-scroll di atas
     // FAB "Pengaturan Demo" (fixed kanan bawah) di mobile
     assertHas(css, 'padding: 16px 16px 96px;');
-    assertHas(html, 'css/style.css?v=mobile1');
+    assertHas(html, 'css/style.css?v=topbarmenu1');
+  });
+
+  await test('html+css+js: menu gear topbar mobile — dropdown Suara/Kiosk/Keluar, tombol desktop tetap ada', async () => {
+    const css = read('css/style.css');
+    const html = read('index.html');
+    const main = read('js/main.js');
+    // Gear hanya tampil di mobile (<=768px): desktop tetap memakai
+    // tombol Suara / Mode Kiosk / Keluar yang berderet.
+    assertHas(html, 'id="btnTopbarMenu"');
+    assertHas(html, 'aria-label="Menu"');
+    assertHas(html, 'aria-expanded="false"');
+    assertHas(html, 'aria-haspopup="true"');
+    assertHas(html, 'aria-controls="topbarMenu"');
+    assertHas(html, 'id="topbarMenu"');
+    assertHas(html, 'role="menu"');
+    // Dropdown berisi 3 item berlabel (ikon + teks, bukan ikon saja)
+    assertHas(html, 'id="topbarMenuSound"');
+    assertHas(html, 'Suara: Nyala');
+    assertHas(html, 'id="topbarMenuKiosk"');
+    assertHas(html, 'Mode Kiosk');
+    assertHas(html, 'id="topbarMenuLogout"');
+    assertHas(html, 'Keluar');
+    // CSS: gear tersembunyi di desktop; dropdown tersembunyi default
+    // (baru tampil saat .open), z-index di bawah modal (5000)
+    assertHas(css, '.topbar-menu-wrap { display: none;');
+    assertHas(css, '.topbar-menu {\n  position: absolute;\n  top: calc(100% + 6px);\n  right: 0;\n  min-width: 220px;');
+    assertHas(css, '  padding: 6px;\n  display: none;\n  z-index: 4600;');
+    assertHas(css, '.topbar-menu-wrap.open .topbar-menu { display: block; }');
+    // CSS mobile: gear tampil, ketiga tombol desktop disembunyikan
+    assertHas(css, '.topbar-menu-wrap {\n    display: block;');
+    assertHas(css, '#btnSoundToggle,\n  #btnKioskToggle,\n  #btnLogout {\n    display: none;');
+    // Tombol desktop TETAP di DOM (tidak dihapus) — dropdown hanya
+    // mendispatch .click() ke handler yang sama (tanpa duplikasi logika)
+    assertHas(html, 'id="btnSoundToggle"');
+    assertHas(html, 'id="btnKioskToggle"');
+    assertHas(html, 'id="btnLogout"');
+    assertHas(main, 'initTopbarMenu');
+    assertHas(main, 'initTopbarMenu();');
+    assertHas(main, "getElementById('btnSoundToggle')?.click()");
+    assertHas(main, "getElementById('btnKioskToggle')?.click()");
+    assertHas(main, "getElementById('btnLogout')?.click()");
+    // Perilaku: buka/tutup via gear, tutup saat ketuk di luar / Esc;
+    // label Suara mengikuti state (Nyala/Mati); Kiosk & Keluar
+    // menutup dropdown setelah aksinya, Suara tetap membuka
+    assertHas(main, "aria-expanded");
+    assertHas(main, "e.key === 'Escape'");
+    assertHas(main, "closest('.topbar-menu-wrap')");
+    assertHas(main, "'Suara: Nyala'");
+    assertHas(main, "'Suara: Mati'");
+    assertHas(html, 'css/style.css?v=topbarmenu1');
   });
 
   await test('scanner.js: MODE_TEXT hanya title+desc; desc presensi satu baris aturan lengkap', async () => {

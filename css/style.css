@@ -2095,6 +2095,52 @@ body.kiosk-lite .btn-hamburger-topbar { display: none; }
 .btn-topbar-icon:hover { background: #f1f5f9; }
 .btn-topbar-icon.active { background: #0f172a; color: #fff; border-color: #0f172a; }
 
+/* ---------- [10.9] Menu gear topbar (HANYA mobile <=768px) ---------- */
+/* Tombol gear + dropdown berisi aksi topbar (Suara / Mode Kiosk /
+   Keluar) supaya baris kedua topbar di HP lebih lega. Desktop tetap
+   memakai tombol-tombol yang berderet; gear tersembunyi di desktop
+   (display: none) dan baru tampil di media query <=768px.
+   Dropdown: absolute di bawah gear, rata kanan, z-index 4600 — di
+   atas konten topbar & gate (4500), di bawah modal (5000). */
+.topbar-menu-wrap { display: none; position: relative; }
+
+.topbar-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 220px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+  padding: 6px;
+  display: none;
+  z-index: 4600;
+}
+
+.topbar-menu-wrap.open .topbar-menu { display: block; }
+
+.topbar-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background: none;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #0f172a;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.topbar-menu-item:hover { background: #f1f5f9; }
+.topbar-menu-item svg { width: 18px; height: 18px; flex: none; }
+.topbar-menu-item-danger { color: #dc2626; }
+
 /* ============================================================
    [11] MODAL — semua dialog popup
    ============================================================ */
@@ -2806,6 +2852,18 @@ body.kiosk-lite .btn-hamburger-topbar { display: none; }
   .demo-badge {
     font-size: 0.65rem;
     padding: 4px 8px;
+  }
+
+  /* --- Menu gear topbar (mobile): tombol aksi bersembunyi di balik
+     dropdown; baris 2 hanya jam + gear + badge MODE DEMO --- */
+  .topbar-menu-wrap {
+    display: block;
+  }
+
+  #btnSoundToggle,
+  #btnKioskToggle,
+  #btnLogout {
+    display: none;
   }
 
   .search-box {
