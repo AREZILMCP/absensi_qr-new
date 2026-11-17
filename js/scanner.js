@@ -419,30 +419,30 @@ const Scanner = (() => {
     return type === 'ok' ? 'BERHASIL' : type === 'warn' ? 'PERHATIAN' : 'GAGAL';
   }
 
-  // Baris detail di bawah nama: jam + tepat waktu/terlambat (masuk)
-  // atau catatan lembur (pulang). Selain itu tampilkan jam saja.
+  // Baris detail di bawah nama: HANYA status, tanpa jam (karyawan tidak
+  // perlu baca jam — jam ada di baris "Terakhir" + riwayat).
+  // ABSENSI MASUK -> "Tepat waktu" / "Terlambat N menit".
+  // ABSENSI PULANG -> "Lembur X" bila lembur, '' bila tidak (baris
+  // detail disembunyikan bila kosong). Headline lain -> jam.
   function detailFor(k, headline, message, timeStr) {
-    const jam = timeStr || Utils.now().toLocaleTimeString('id-ID');
     if (headline === 'ABSENSI MASUK' && k.absenAt) {
       const d = new Date(k.absenAt);
       if (!Number.isNaN(d.getTime())) {
         const telat = d.getHours() * 60 + d.getMinutes() - 8 * 60;
-        return 'Masuk ' + jam + ' • ' + (telat > 0 ? 'Terlambat ' + telat + ' menit' : 'Tepat waktu');
+        return telat > 0 ? 'Terlambat ' + telat + ' menit' : 'Tepat waktu';
       }
     }
     if (headline === 'ABSENSI PULANG' && k.pulangAt) {
       const d = new Date(k.pulangAt);
       if (!Number.isNaN(d.getTime())) {
         const lemburMenit = Math.max(0, d.getHours() * 60 + d.getMinutes() - 16 * 60);
-        return lemburMenit > 0
-          ? 'Pulang ' + jam + ' • Lembur ' + Utils.formatDurasi(lemburMenit)
-          : 'Pulang ' + jam;
+        return lemburMenit > 0 ? 'Lembur ' + Utils.formatDurasi(lemburMenit) : '';
       }
     }
     if (headline === 'ABSENSI PULANG') {
-      return 'Pulang ' + jam;
+      return '';
     }
-    return jam;
+    return timeStr || Utils.now().toLocaleTimeString('id-ID');
   }
 
   // Kode kupon ditampilkan besar hanya saat makan siang / ekstra
@@ -453,12 +453,6 @@ const Scanner = (() => {
     return k.kuponKode;
   }
 
-  function photoHtmlFor(k) {
-    return k.foto
-      ? `<img src="${escapeHtml(k.foto)}" alt="${escapeHtml(k.nama)}">`
-      : `<span class="scan-photo-initial">${escapeHtml((k.nama || '?').charAt(0).toUpperCase())}</span>`;
-  }
-
   function buildEmployeeItem(k, type, message, timeStr) {
     const headline = headlineFor(message, type);
     const icon = type === 'ok' ? '✓' : type === 'warn' ? '!' : '✕';
@@ -467,6 +461,7 @@ const Scanner = (() => {
       ? `<div class="scan-overlay-kupon"><span class="scan-overlay-kupon-lbl">Kode kupon</span><span class="scan-overlay-kupon-kode">${escapeHtml(kode)}</span></div>`
       : '';
     const detail = detailFor(k, headline, message, timeStr);
+    const detailHtml = detail ? `<div class="scan-overlay-detail">${escapeHtml(detail)}</div>` : '';
     const html = `
       <div class="scan-overlay-inner scan-overlay-${type}">
         <div class="scan-overlay-icon" aria-hidden="true">${icon}</div>
@@ -474,10 +469,10 @@ const Scanner = (() => {
           <div class="scan-overlay-headline">${escapeHtml(headline)}</div>
           <div class="scan-overlay-name">${escapeHtml(k.nama)}</div>
           <div class="scan-overlay-meta"><span>${escapeHtml(k.id)}</span><span class="scan-meta-dot">•</span><span>${escapeHtml(k.kategori || '-')}</span></div>
-          <div class="scan-overlay-detail">${escapeHtml(detail)}</div>
+          ${detailHtml}
           ${kodeHtml}
         </div>
-        <div class="scan-overlay-photo">${photoHtmlFor(k)}</div>
+        <div class="scan-overlay-note">Tertutup otomatis dalam 1 detik...</div>
         <button type="button" class="scan-overlay-close" aria-label="Tutup hasil scan">✕</button>
       </div>`;
     return { html, type, headline, name: k.nama, detail, kode };
@@ -493,6 +488,7 @@ const Scanner = (() => {
           <div class="scan-overlay-headline">${escapeHtml(headline)}</div>
           <div class="scan-overlay-detail">${escapeHtml(msg)}</div>
         </div>
+        <div class="scan-overlay-note">Tertutup otomatis dalam 1 detik...</div>
         <button type="button" class="scan-overlay-close" aria-label="Tutup hasil scan">✕</button>
       </div>`;
     return { html, type, headline, message: msg };

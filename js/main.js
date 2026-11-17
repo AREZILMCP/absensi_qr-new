@@ -26,7 +26,7 @@
   };
 
   const TAB_TITLES = {
-    dashboard:            'Dashboard',
+    dashboard:            'Dashboard Presensi',
     karyawan:             'Data Karyawan',
     foto:                 'Foto Karyawan',
     kartu:                'ID Card Karyawan',
@@ -64,12 +64,18 @@
     SUBMENUS.forEach(({ toggle, submenu }) => setSubmenuOpen(toggle, submenu, false));
   }
 
+  const TAB_SUBTITLES = {
+    dashboard: 'Monitoring kehadiran dan aktivitas presensi karyawan',
+  };
+
   function updateTopbarTitle(tab) {
     const titleEl = document.getElementById('topbarTitle');
     if (!titleEl) return;
-    const text = TAB_TITLES[tab] || 'Dashboard';
+    const text = TAB_TITLES[tab] || 'Dashboard Presensi';
     titleEl.textContent = text;
     document.title = `${text} — Absensi & Kupon Makan QR`;
+    const subEl = document.getElementById('topbarSubtitle');
+    if (subEl) subEl.textContent = TAB_SUBTITLES[tab] || '';
   }
 
   // Auto-start kamera dashboard yang ditunda: tunggu layout final
@@ -120,7 +126,10 @@
     const btn = document.getElementById('btnToggleCamera');
     if (!btn) return;
     const on = typeof Scanner !== 'undefined' && Scanner.isActive && Scanner.isActive();
-    btn.textContent = on ? 'Matikan Kamera' : 'Nyalakan Kamera';
+    const label = btn.querySelector ? btn.querySelector('.btn-label') : null;
+    const text = on ? 'Matikan Kamera' : 'Nyalakan Kamera';
+    if (label) label.textContent = text;
+    else btn.textContent = text;
     btn.setAttribute('aria-pressed', String(on));
     btn.classList.toggle('active', on);
   }
@@ -244,14 +253,14 @@
     });
   }
 
-  // Tombol suara scan (🔊/🔇, tersimpan di localStorage via Scanner)
-  // dan Mode Kiosk-lite (sembunyikan sidebar + FAB, fullscreen).
+  // Tombol suara scan (ikon speaker SVG — CSS menampilkan yang sesuai
+  // aria-pressed; tersimpan di localStorage via Scanner) dan Mode
+  // Kiosk-lite (sembunyikan sidebar + FAB, fullscreen).
   function initScanToggles() {
     const btnSound = document.getElementById('btnSoundToggle');
     const syncSoundBtn = () => {
       if (!btnSound || typeof Scanner === 'undefined') return;
       const on = Scanner.isSoundEnabled();
-      btnSound.textContent = on ? '🔊' : '🔇';
       btnSound.setAttribute('aria-pressed', String(on));
       btnSound.title = on ? 'Bunyi scan: aktif — klik untuk mematikan' : 'Bunyi scan: mati — klik untuk mengaktifkan';
     };
@@ -304,6 +313,12 @@
       ? (item.headline + ' — ' + item.name)
       : (item.message || item.headline || '');
     textEl.textContent = (jam ? jam + ' · ' : '') + inti;
+    const badge = document.getElementById('scanLastBadge');
+    if (badge) {
+      badge.hidden = false;
+      badge.className = 'scan-last-badge ' + (item.type || 'ok');
+      badge.textContent = item.type === 'err' ? 'Gagal' : item.type === 'warn' ? 'Perhatian' : 'Berhasil';
+    }
   }
   function initScanLast() {
     if (typeof Scanner !== 'undefined' && Scanner.setResultHook) {
@@ -606,8 +621,10 @@
     if (user) {
       const nameEl   = document.getElementById('userName');
       const avatarEl = document.getElementById('userAvatar');
+      const roleEl   = document.getElementById('userRoleLabel');
       if (nameEl)   nameEl.textContent   = user.name;
       if (avatarEl) avatarEl.textContent = (user.name || 'A').charAt(0).toUpperCase();
+      if (roleEl)   roleEl.textContent   = user.role === 'admin' ? 'Administrator' : 'Pengguna';
 
       // Tampilkan / sembunyikan menu pengaturan berdasarkan role
       const navPengaturan = document.getElementById('navPengaturanGroup');

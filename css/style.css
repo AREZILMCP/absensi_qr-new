@@ -286,6 +286,39 @@ input.input-error:focus {
   white-space: nowrap;
   color: #64748b;
 }
+.cell-waktu .ic-clock { width: 14px; height: 14px; color: #94a3b8; vertical-align: -2px; margin-right: 6px; }
+
+.riwayat-nama { display: inline-flex; align-items: center; gap: 8px; }
+
+.riwayat-initial {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.jenis-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.jenis-badge svg { width: 13px; height: 13px; }
+.badge-green { background: #dcfce7; color: #166534; }
+.badge-gray { background: #f1f5f9; color: #475569; }
+.badge-blue { background: #dbeafe; color: #1d4ed8; }
+.badge-purple { background: #ede9fe; color: #6d28d9; }
 
 .col-no,
 .cell-no {
@@ -665,7 +698,7 @@ input.input-error:focus {
 /* ---------- [7.2] Sidebar + Nav ---------- */
 .sidebar {
   width: 240px;
-  background: #1a1a1a;
+  background: #0f172a;
   color: #cbd5e1;
   display: flex;
   flex-direction: column;
@@ -686,29 +719,53 @@ input.input-error:focus {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 8px 12px 22px;
-  border-bottom: 1px solid #2d2d2d;
+  gap: 8px;
+  padding: 0 6px 12px;
+  border-bottom: 1px solid #1e293b;
   margin-bottom: 18px;
+}
+
+.brand-block {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
 }
 
 .brand-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #e2e8f0;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #fff;
+  color: #0f172a;
 }
 
 .brand-icon svg {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
 }
 
-.brand-text {
-  font-size: 1.05rem;
+.brand-texts {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.brand-name {
+  font-size: 1rem;
   font-weight: 700;
   color: #fff;
-  letter-spacing: 0.3px;
+  line-height: 1.2;
+}
+
+.brand-sub {
+  font-size: 0.68rem;
+  color: #94a3b8;
+  white-space: nowrap;
 }
 
 .sidebar-nav {
@@ -735,12 +792,12 @@ input.input-error:focus {
 }
 
 .nav-item:hover {
-  background: #2a2a2a;
+  background: #1e293b;
   color: #fff;
 }
 
 .nav-item.active {
-  background: #2a2a2a;
+  background: #2563eb;
   color: #fff;
   font-weight: 600;
 }
@@ -792,7 +849,7 @@ input.input-error:focus {
   gap: 2px;
   margin: 4px 0 4px 14px;
   padding-left: 10px;
-  border-left: 1px solid #2d2d2d;
+  border-left: 1px solid #1e293b;
 }
 
 .nav-submenu.open {
@@ -814,14 +871,43 @@ input.input-error:focus {
 }
 
 .nav-subitem:hover {
-  background: #242424;
+  background: #1e293b;
   color: #fff;
 }
 
 .nav-subitem.active {
-  background: #2a2a2a;
+  background: #1e293b;
   color: #fff;
   font-weight: 600;
+}
+
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 12px 2px;
+  border-top: 1px solid #1e293b;
+  margin-top: auto;
+}
+
+.sidebar-user-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sidebar-user-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-user-role {
+  font-size: 0.72rem;
+  color: #94a3b8;
 }
 
 /* ---------- [7.3] Main ---------- */
@@ -857,7 +943,7 @@ input.input-error:focus {
 }
 
 .topbar-title {
-  font-size: 1.15rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: #0f172a;
   letter-spacing: 0.1px;
@@ -866,7 +952,14 @@ input.input-error:focus {
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+  line-height: 1.2;
 }
+
+.topbar-titles { display: flex; flex-direction: column; min-width: 0; }
+
+.topbar-subtitle { font-size: 0.8rem; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.topbar-subtitle:empty { display: none; }
 
 .search-box {
   display: flex;
@@ -955,13 +1048,13 @@ input.input-error:focus {
 
 /* Tombol di SIDEBAR pakai tema gelap */
 .btn-hamburger-sidebar {
-  background: #2a2a2a;
-  border-color: #3a3a3a;
-  color: #cbd5e1;
+  background: #1e293b;
+  border-color: #334155;
+  color: #94a3b8;
 }
 
 .btn-hamburger-sidebar:hover {
-  background: #3a3a3a;
+  background: #334155;
   color: #fff;
 }
 
@@ -1166,13 +1259,36 @@ input.input-error:focus {
 }
 
 .stat-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
   background: #fff;
-  border-radius: 10px;
-  padding: 18px 14px;
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+  padding: 16px;
   border: 1px solid #e2e8f0;
-  text-align: center;
+  text-align: left;
   transition: box-shadow 0.2s ease, transform 0.15s ease;
 }
+
+.stat-icon {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-icon svg { width: 24px; height: 24px; }
+.stat-icon-blue { background: #dbeafe; color: #2563eb; }
+.stat-icon-red { background: #fee2e2; color: #dc2626; }
+.stat-icon-green { background: #dcfce7; color: #16a34a; }
+.stat-icon-purple { background: #ede9fe; color: #7c3aed; }
+
+.stat-body { min-width: 0; }
+.stat-num.purple { color: #7c3aed; }
 
 .stat-card:hover {
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
@@ -1199,7 +1315,8 @@ input.input-error:focus {
 /* ---------- [9.3] Info card + row + list ---------- */
 .info-card {
   background: #fff;
-  border-radius: 10px;
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
   border: 1px solid #e2e8f0;
   padding: 16px;
 }
@@ -1214,11 +1331,29 @@ input.input-error:focus {
 }
 
 .info-header h4 {
-  font-size: 0.75rem;
+  font-size: 0.95rem;
   font-weight: 700;
-  color: #64748b;
-  letter-spacing: 0.8px;
+  color: #0f172a;
+  letter-spacing: 0;
 }
+
+.info-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.info-title-icon { width: 18px; height: 18px; color: #2563eb; flex: none; }
+.info-header-right { display: flex; align-items: center; gap: 10px; }
+
+.grafik-filter {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  padding: 6px 8px;
+  font-size: 0.85rem;
+  color: #0f172a;
+  cursor: pointer;
+}
+
+.legend .pct { color: #94a3b8; font-size: 0.8rem; font-weight: 600; }
+
+.link-btn-header { padding: 0; font-size: 0.85rem; }
 
 .info-row {
   display: grid;
@@ -1418,7 +1553,8 @@ input.input-error:focus {
   grid-template-rows: 1fr;
   background: #fff;
   border: 1px solid #e2e8f0;
-  border-radius: 10px;
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
   overflow: hidden;
   margin-bottom: 16px;
 }
@@ -1448,23 +1584,65 @@ input.input-error:focus {
   object-fit: cover;
 }
 
+.hero-cam-corners { display: none; position: absolute; inset: 16px; pointer-events: none; z-index: 3; }
+.hero-cam:not(:has(#reader > *)) .hero-cam-corners { display: block; }
+.hero-cam-corners .corner { position: absolute; width: 28px; height: 28px; border: 3px solid rgba(255, 255, 255, 0.85); }
+.hero-cam-corners .corner.tl { top: 0; left: 0; border-right: none; border-bottom: none; border-top-left-radius: 6px; }
+.hero-cam-corners .corner.tr { top: 0; right: 0; border-left: none; border-bottom: none; border-top-right-radius: 6px; }
+.hero-cam-corners .corner.bl { bottom: 0; left: 0; border-right: none; border-top: none; border-bottom-left-radius: 6px; }
+.hero-cam-corners .corner.br { bottom: 0; right: 0; border-left: none; border-top: none; border-bottom-right-radius: 6px; }
+
 .hero-cam-hint {
   position: absolute;
   inset: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  text-align: center;
-  padding: 16px;
-  color: #94a3b8;
-  font-size: 0.9rem;
+  gap: 10px;
+  padding: 20px;
+  color: #fff;
   pointer-events: none;
+  z-index: 2;
 }
 
-/* Hint hilang begitu scanner mengisi #reader (mulai scan) */
-.hero-cam:has(#reader > *) .hero-cam-hint {
-  display: none;
+.hero-cam-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+
+.hero-cam-icon svg { width: 30px; height: 30px; }
+
+.hero-cam-title { font-size: 1.05rem; font-weight: 700; }
+.hero-cam-sub { font-size: 0.82rem; color: #94a3b8; max-width: 260px; text-align: center; line-height: 1.4; }
+
+.hero-cam-hint #btnToggleCamera {
+  width: auto;
+  min-width: 200px;
+  margin-top: 6px;
+  pointer-events: auto;
+  background: #fff;
+  color: #0f172a;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.hero-cam-hint #btnToggleCamera svg { width: 17px; height: 17px; }
+.hero-cam-hint #btnToggleCamera.active { background: #fee2e2; color: #991b1b; }
+
+/* Saat scan jalan: ikon + teks hilang, tombol pindah ke bawah video */
+.hero-cam:has(#reader > *) .hero-cam-hint { justify-content: flex-end; padding-bottom: 14px; }
+.hero-cam:has(#reader > *) .hero-cam-hint .hero-cam-icon,
+.hero-cam:has(#reader > *) .hero-cam-hint .hero-cam-title,
+.hero-cam:has(#reader > *) .hero-cam-hint .hero-cam-sub { display: none; }
 
 .hero-side {
   padding: 18px;
@@ -1485,21 +1663,23 @@ input.input-error:focus {
   max-width: 900px;
 }
 
-/* Tombol kamera: lebar auto (bukan full-width seperti anak lain). */
-.hero-side #btnToggleCamera {
-  width: auto;
-  min-width: 220px;
-}
-
 /* Kotak "Terakhir" lebih sempit dari isi lain. */
 .hero-side .scan-last {
   max-width: 720px;
 }
 
 .hero-side .scan-head {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
   text-align: left;
   margin-bottom: 0;
 }
+
+.scan-title-icon { flex: none; color: #2563eb; margin-top: 2px; }
+.scan-title-icon svg { width: 22px; height: 22px; display: block; }
+
+.scan-head-text { min-width: 0; }
 
 .hero-side .scan-controls {
   justify-content: flex-start;
@@ -1510,7 +1690,7 @@ input.input-error:focus {
    overlay gate 1 detik hilang (riwayat lengkap ada di bawah). */
 .scan-last {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   font-size: 0.85rem;
   color: #475569;
@@ -1519,6 +1699,21 @@ input.input-error:focus {
   border-radius: 8px;
   padding: 10px 12px;
 }
+
+.scan-last .ic-clock { width: 16px; height: 16px; color: #94a3b8; flex: none; }
+
+.scan-last-badge {
+  margin-left: auto;
+  flex: none;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.scan-last-badge.ok { background: #dcfce7; color: #166534; }
+.scan-last-badge.warn { background: #fef3c7; color: #92400e; }
+.scan-last-badge.err { background: #fee2e2; color: #991b1b; }
 
 .scan-last-lbl {
   font-weight: 700;
@@ -1541,6 +1736,10 @@ input.input-error:focus {
 
 .scan-mode-btn {
   flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   border: none;
   background: transparent;
   padding: 8px 10px;
@@ -1551,10 +1750,12 @@ input.input-error:focus {
   cursor: pointer;
 }
 
+.scan-mode-btn svg { width: 18px; height: 18px; flex: none; }
+
 .scan-mode-btn.active {
-  background: #fff;
-  color: #0f172a;
-  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+  background: #dbeafe;
+  color: #1d4ed8;
+  box-shadow: none;
 }
 
 /* Tombol nyala/mati kamera di panel kanan hero (di bawah saklar mode).
@@ -1722,6 +1923,7 @@ input.input-error:focus {
   flex: 1;
   min-width: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 18px;
@@ -1737,29 +1939,29 @@ input.input-error:focus {
 
 .scan-overlay-icon {
   flex: none;
-  width: 88px;
-  height: 88px;
+  width: 140px;
+  height: 140px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.18);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 3rem;
+  font-size: 3.5rem;
   font-weight: 700;
   line-height: 1;
 }
 
-.scan-overlay-info { flex: 0 1 auto; max-width: min(880px, 72%); min-width: 0; text-align: center; }
+.scan-overlay-info { flex: 0 1 auto; max-width: min(1200px, 92%); min-width: 0; text-align: center; }
 
 .scan-overlay-headline {
-  font-size: clamp(1.5rem, 3vw, 2.4rem);
+  font-size: clamp(1.75rem, 3.5vw, 2.6rem);
   font-weight: 800;
   letter-spacing: 0.4px;
 }
 
 .scan-overlay-name {
-  font-size: clamp(2.5rem, 5vw, 4.5rem);
+  font-size: clamp(2.75rem, 6vw, 5.5rem);
   font-weight: 800;
   line-height: 1.05;
   white-space: nowrap;
@@ -1767,29 +1969,13 @@ input.input-error:focus {
   text-overflow: ellipsis;
 }
 
-.scan-overlay-meta { font-size: 1rem; opacity: 0.85; }
+.scan-overlay-meta { font-size: 1.1rem; opacity: 0.9; }
 .scan-overlay-detail { font-size: clamp(1.05rem, 1.6vw, 1.5rem); margin-top: 2px; }
 
-.scan-overlay-kupon { margin-top: 6px; display: flex; align-items: baseline; justify-content: center; gap: 10px; }
+.scan-overlay-kupon { margin-top: 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .scan-overlay-kupon-lbl { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.85; }
 .scan-overlay-kupon-kode { font-size: clamp(1.8rem, 3.4vw, 2.8rem); font-weight: 800; letter-spacing: 1px; }
-.scan-overlay-note { font-size: 0.85rem; opacity: 0.9; margin-top: 2px; }
-
-.scan-overlay-photo {
-  flex: none;
-  width: 88px;
-  height: 88px;
-  border-radius: 50%;
-  overflow: hidden;
-  border: 3px solid rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.15);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.scan-overlay-photo img { width: 100%; height: 100%; object-fit: cover; }
-.scan-overlay-photo .scan-photo-initial { font-size: 2.2rem; color: #fff; }
+.scan-overlay-note { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); font-size: 0.85rem; opacity: 0.85; white-space: nowrap; }
 
 .scan-overlay-close {
   position: absolute;
@@ -1820,8 +2006,7 @@ input.input-error:focus {
 .scan-overlay-waiting[hidden] { display: none; }
 
 @media (max-width: 560px) {
-  .scan-overlay-photo { display: none; }
-  .scan-overlay-icon { width: 64px; height: 64px; font-size: 2.2rem; }
+  .scan-overlay-icon { width: 96px; height: 96px; font-size: 2.6rem; }
   .scan-overlay-inner { gap: 12px; padding: 12px 14px; }
   .scan-overlay-headline { font-size: clamp(1.2rem, 4vw, 1.6rem); }
   .scan-overlay-name { font-size: clamp(1.8rem, 6vw, 2.2rem); }
@@ -1881,6 +2066,10 @@ body.kiosk-lite .btn-hamburger-topbar { display: none; }
 
 /* ---------- [10.8] Tombol topbar: suara & kiosk ---------- */
 .btn-topbar-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   border: 1px solid #e2e8f0;
   background: #fff;
   border-radius: 8px;
@@ -1890,6 +2079,18 @@ body.kiosk-lite .btn-hamburger-topbar { display: none; }
   color: #0f172a;
   white-space: nowrap;
 }
+
+.btn-topbar-icon svg { width: 18px; height: 18px; flex: none; }
+.btn-topbar-icon .btn-label { font-size: 0.85rem; font-weight: 600; }
+
+#btnSoundToggle .ic-sound-off { display: none; }
+#btnSoundToggle[aria-pressed="false"] .ic-sound-on { display: none; }
+#btnSoundToggle[aria-pressed="false"] .ic-sound-off { display: block; }
+
+.btn-logout { display: inline-flex; align-items: center; gap: 6px; }
+.btn-logout svg { width: 15px; height: 15px; }
+
+.btn-hamburger svg { width: 18px; height: 18px; }
 
 .btn-topbar-icon:hover { background: #f1f5f9; }
 .btn-topbar-icon.active { background: #0f172a; color: #fff; border-color: #0f172a; }
@@ -2637,7 +2838,11 @@ body.kiosk-lite .btn-hamburger-topbar { display: none; }
 .sim-card.sim-active { background: #fef3c7; border-style: solid; }
 .sim-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
 .sim-head h4 { font-size: 0.95rem; }
-.sim-badge { font-size: 0.72rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
+.sim-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 0.72rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
+.sim-badge svg { width: 13px; height: 13px; }
+
+.sim-strip #btnSimStripBuka { display: inline-flex; align-items: center; gap: 6px; }
+.sim-strip #btnSimStripBuka svg { width: 14px; height: 14px; }
 .sim-badge-off { background: #e2e8f0; color: #475569; }
 .sim-badge-on { background: #dc2626; color: #fff; }
 .sim-clock-line { margin-top: 6px; }

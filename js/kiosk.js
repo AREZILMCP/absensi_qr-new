@@ -29,7 +29,10 @@ const Kiosk = (() => {
     if (btn) {
       btn.classList.toggle('active', on);
       btn.setAttribute('aria-pressed', String(on));
-      btn.textContent = on ? '⛶ Keluar Kiosk' : '⛶ Mode Kiosk';
+      const label = btn.querySelector ? btn.querySelector('.btn-label') : null;
+      const text = on ? 'Keluar Kiosk' : 'Mode Kiosk';
+      if (label) label.textContent = text;
+      else btn.textContent = text;
     }
     try { localStorage.setItem(KEY, on ? '1' : '0'); } catch { /* abaikan */ }
   }

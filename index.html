@@ -8,7 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
-  <link rel="stylesheet" href="css/style.css?v=overlayfull1" />
+  <link rel="stylesheet" href="css/style.css?v=redesign1" />
 </head>
 <body>
 
@@ -61,9 +61,23 @@
     <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-brand">
-        <span class="brand-text">Main menu</span>
+        <div class="brand-block">
+          <span class="brand-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 8V6a2 2 0 0 1 2-2h2"/>
+              <path d="M16 4h2a2 2 0 0 1 2 2v2"/>
+              <path d="M20 16v2a2 2 0 0 1-2 2h-2"/>
+              <path d="M8 20H6a2 2 0 0 1-2-2v-2"/>
+              <rect x="9" y="9" width="6" height="6" rx="1.2"/>
+            </svg>
+          </span>
+          <span class="brand-texts">
+            <span class="brand-name">Presensi</span>
+            <span class="brand-sub">Sistem Kehadiran Karyawan</span>
+          </span>
+        </div>
         <button type="button" class="btn-hamburger btn-hamburger-sidebar" id="btnSidebarClose" aria-label="Tutup menu navigasi" aria-expanded="true" aria-controls="sidebar">
-          <span aria-hidden="true">-</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
         </button>
       </div>
 
@@ -160,18 +174,29 @@
           </div>
         </div>
       </nav>
+
+      <div class="sidebar-user">
+        <div class="avatar" id="userAvatar">A</div>
+        <div class="sidebar-user-info">
+          <span class="sidebar-user-name" id="userName">Admin</span>
+          <span class="sidebar-user-role" id="userRoleLabel">Administrator</span>
+        </div>
+      </div>
     </aside>
 
     <div class="main">
       <header class="topbar">
         <div class="topbar-left">
           <button type="button" class="btn-hamburger btn-hamburger-topbar" id="btnSidebarToggle" aria-label="Buka menu navigasi" aria-expanded="true" aria-controls="sidebar">
-            <span aria-hidden="true">≡</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
           </button>
           <button type="button" class="btn-hamburger btn-hamburger-home" id="btnHome" aria-label="Kembali ke Dashboard" title="Kembali ke Dashboard">
-            <span aria-hidden="true">⌂</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M9 22V12h6v10"/></svg>
           </button>
-          <h2 class="topbar-title" id="topbarTitle">Dashboard</h2>
+          <div class="topbar-titles">
+            <h2 class="topbar-title" id="topbarTitle">Dashboard Presensi</h2>
+            <span class="topbar-subtitle" id="topbarSubtitle">Monitoring kehadiran dan aktivitas presensi karyawan</span>
+          </div>
         </div>
 
         <div class="topbar-right">
@@ -179,12 +204,19 @@
             <span class="topbar-clock-time" id="dashClockTime">--:--:--</span>
             <span class="topbar-clock-date" id="dashClockDate">&mdash;</span>
           </div>
-          <button type="button" class="btn-topbar-icon" id="btnSoundToggle" title="Bunyi scan: aktif — klik untuk mematikan" aria-label="Bunyi scan" aria-pressed="true">🔊</button>
-          <button type="button" class="btn-topbar-icon btn-kiosk" id="btnKioskToggle" title="Mode Kiosk: sembunyikan menu untuk PC standby" aria-pressed="false">⛶ Mode Kiosk</button>
+          <button type="button" class="btn-topbar-icon" id="btnSoundToggle" title="Bunyi scan: aktif — klik untuk mematikan" aria-label="Bunyi scan" aria-pressed="true">
+            <svg class="ic-sound-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+            <svg class="ic-sound-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="m22 9-6 6"/><path d="m16 9 6 6"/></svg>
+          </button>
+          <button type="button" class="btn-topbar-icon btn-kiosk" id="btnKioskToggle" title="Mode Kiosk: sembunyikan menu untuk PC standby" aria-pressed="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+            <span class="btn-label">Mode Kiosk</span>
+          </button>
           <button type="button" class="demo-badge" id="demoBadge" hidden title="Mode Demo aktif &mdash; klik untuk mematikan dan kembali ke login server">MODE DEMO</button>
-          <span class="user-name" id="userName">Admin</span>
-          <div class="avatar" id="userAvatar">A</div>
-          <button type="button" class="btn btn-danger btn-sm" id="btnLogout" title="Keluar">Keluar</button>
+          <button type="button" class="btn btn-danger btn-sm btn-logout" id="btnLogout" title="Keluar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+            <span>Keluar</span>
+          </button>
         </div>
       </header>
 
@@ -195,63 +227,133 @@
           <div class="hero-scan">
             <div class="hero-cam">
               <div id="reader"></div>
-              <div class="hero-cam-hint">Kamera belum aktif &mdash; periksa izin kamera di browser</div>
+              <div class="hero-cam-corners" aria-hidden="true"><span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span></div>
+              <div class="hero-cam-hint">
+                <span class="hero-cam-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+                </span>
+                <span class="hero-cam-title">Kamera belum aktif</span>
+                <span class="hero-cam-sub">Periksa izin kamera di browser dan klik Nyalakan Kamera.</span>
+                <button type="button" class="btn camera-toggle" id="btnToggleCamera" aria-pressed="false">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+                  <span class="btn-label">Nyalakan Kamera</span>
+                </button>
+              </div>
             </div>
             <div class="hero-side">
               <div class="scan-mode">
-                <button type="button" class="scan-mode-btn active" data-scan-mode="presensi">Scan Presensi</button>
-                <button type="button" class="scan-mode-btn" data-scan-mode="kantin">Scan Kantin</button>
+                <button type="button" class="scan-mode-btn active" data-scan-mode="presensi">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2"/><path d="M16 4h2a2 2 0 0 1 2 2v2"/><path d="M20 16v2a2 2 0 0 1-2 2h-2"/><path d="M8 20H6a2 2 0 0 1-2-2v-2"/><rect x="9" y="9" width="6" height="6" rx="1.2"/></svg>
+                  <span>Scan Presensi</span>
+                </button>
+                <button type="button" class="scan-mode-btn" data-scan-mode="kantin">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>
+                  <span>Scan Kantin</span>
+                </button>
               </div>
-              <button type="button" class="btn btn-secondary camera-toggle" id="btnToggleCamera" aria-pressed="false">Nyalakan Kamera</button>
               <div class="scan-head">
-                <h4 id="scanTitle">Scan QR Karyawan — Presensi</h4>
-                <p id="scanDesc">Pagi check-in (maks 08:15) &middot; 12:00 makan siang &middot; 16:00 check-out &middot; &gt;16:00 lembur.</p>
+                <span class="scan-title-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2"/><path d="M16 4h2a2 2 0 0 1 2 2v2"/><path d="M20 16v2a2 2 0 0 1-2 2h-2"/><path d="M8 20H6a2 2 0 0 1-2-2v-2"/><rect x="9" y="9" width="6" height="6" rx="1.2"/></svg>
+                </span>
+                <div class="scan-head-text">
+                  <h4 id="scanTitle">Scan QR Karyawan — Presensi</h4>
+                  <p id="scanDesc">Pagi check-in (maks 08:15) &middot; 12:00 makan siang &middot; 16:00 check-out &middot; &gt;16:00 lembur.</p>
+                </div>
               </div>
-              <div class="scan-last" id="scanLast"><span class="scan-last-lbl">Terakhir</span><span class="scan-last-text" id="scanLastText">Belum ada scan</span></div>
+              <div class="scan-last" id="scanLast">
+                <svg class="ic-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                <span class="scan-last-lbl">Terakhir</span>
+                <span class="scan-last-text" id="scanLastText">Belum ada scan</span>
+                <span class="scan-last-badge" id="scanLastBadge" hidden>Berhasil</span>
+              </div>
             </div>
             <div class="result scan-overlay" id="resultScan" role="status" aria-live="polite"></div>
           </div>
 
           <!-- Strip ramping: simulasi aktif cukup ditandai satu baris; panel lengkap pindah ke modal Pengaturan Demo (FAB) -->
           <div class="sim-strip" id="simStrip" hidden>
-            <span class="sim-badge sim-badge-on">SIMULASI AKTIF</span>
+            <span class="sim-badge sim-badge-on">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><path d="M8.5 15.5a5 5 0 0 1 0-7"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M5.6 18.4a9 9 0 0 1 0-12.8"/><path d="M18.4 5.6a9 9 0 0 1 0 12.8"/></svg>
+                  <span>SIMULASI AKTIF</span>
+                </span>
             <span>Jam sistem: <strong id="simStripClock">--:--:--</strong></span>
-            <button type="button" class="btn btn-sm btn-secondary" id="btnSimStripBuka">Pengaturan Demo</button>
+            <button type="button" class="btn btn-sm btn-secondary" id="btnSimStripBuka">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg>
+                  <span>Pengaturan Demo</span>
+                </button>
           </div>
 
           <div class="dash-grid">
             <div class="dash-col-main">
               <div class="stats-cards">
-                <div class="stat-card"><div class="stat-num blue" id="statTotal">0</div><div class="stat-lbl">Total Karyawan</div></div>
-                <div class="stat-card"><div class="stat-num red" id="statBelum">0</div><div class="stat-lbl">Belum Absensi</div></div>
-                <div class="stat-card"><div class="stat-num green" id="statHadir">0</div><div class="stat-lbl">Sudah Absensi</div></div>
-                <div class="stat-card"><div class="stat-num blue" id="statMakan">0</div><div class="stat-lbl">Sudah Ambil Makan</div></div>
+                <div class="stat-card">
+                  <span class="stat-icon stat-icon-blue" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                  </span>
+                  <div class="stat-body"><div class="stat-num blue" id="statTotal">0</div><div class="stat-lbl">Total Karyawan</div></div>
+                </div>
+                <div class="stat-card">
+                  <span class="stat-icon stat-icon-red" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="m14 14 4 4"/><path d="m18 14-4 4"/></svg>
+                  </span>
+                  <div class="stat-body"><div class="stat-num red" id="statBelum">0</div><div class="stat-lbl">Belum Absensi</div></div>
+                </div>
+                <div class="stat-card">
+                  <span class="stat-icon stat-icon-green" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg>
+                  </span>
+                  <div class="stat-body"><div class="stat-num green" id="statHadir">0</div><div class="stat-lbl">Sudah Absensi</div></div>
+                </div>
+                <div class="stat-card">
+                  <span class="stat-icon stat-icon-purple" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>
+                  </span>
+                  <div class="stat-body"><div class="stat-num purple" id="statMakan">0</div><div class="stat-lbl">Sudah Ambil Makan</div></div>
+                </div>
               </div>
               <div class="info-row">
                 <div class="info-card">
-                  <div class="info-header"><h4>GRAFIK KEHADIRAN</h4><span class="info-date" id="grafikTanggal"></span></div>
+                  <div class="info-header">
+                    <div class="info-title">
+                      <svg class="info-title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 13v4M12 9v8M17 5v12"/></svg>
+                      <h4>Grafik Kehadiran</h4>
+                    </div>
+                    <div class="info-header-right">
+                      <span class="info-date" id="grafikTanggal"></span>
+                      <select class="grafik-filter" id="grafikFilter" aria-label="Rentang grafik kehadiran">
+                        <option value="today" selected>Hari ini</option>
+                        <option value="yesterday">Kemarin</option>
+                        <option value="week">7 hari terakhir</option>
+                      </select>
+                    </div>
+                  </div>
                   <div class="info-body grafik-body">
                     <div class="donut-wrap">
                       <div class="donut" id="donutChart"><div class="donut-hole"><span id="donutPercent">0%</span></div></div>
-                      <div class="donut-label">Kehadiran hari ini</div>
+                      <div class="donut-label" id="donutLabel">Kehadiran hari ini</div>
                     </div>
                     <ul class="legend">
-                      <li><span class="dot dot-green"></span>Tepat waktu<span class="val" id="legendTepat">0</span></li>
-                      <li><span class="dot dot-amber"></span>Terlambat<span class="val" id="legendTelat">0</span></li>
-                      <li><span class="dot dot-gray"></span>Belum absensi<span class="val" id="legendBelum">0</span></li>
+                      <li><span class="dot dot-green"></span>Tepat waktu<span class="val" id="legendTepat">0</span><span class="pct" id="legendTepatPct">0%</span></li>
+                      <li><span class="dot dot-amber"></span>Terlambat<span class="val" id="legendTelat">0</span><span class="pct" id="legendTelatPct">0%</span></li>
+                      <li><span class="dot dot-gray"></span>Belum absensi<span class="val" id="legendBelum">0</span><span class="pct" id="legendBelumPct">0%</span></li>
                     </ul>
                   </div>
-                  <div class="grafik-foot"><span class="dot dot-orange"></span>Lembur hari ini: <strong id="lemburHariIni">0</strong> karyawan<span class="foot-sep">&middot;</span>Kupon terbit: <strong id="kuponTerbit">0</strong></div>
+                  <div class="grafik-foot"><span class="dot dot-orange"></span><span id="lemburLabel">Lembur hari ini:</span> <strong id="lemburHariIni">0</strong> karyawan<span class="foot-sep">|</span><span id="kuponLabel">Kupon terbit:</span> <strong id="kuponTerbit">0</strong></div>
                 </div>
                 <div class="info-card">
-                  <div class="info-header"><h4>RIWAYAT SCAN</h4></div>
+                  <div class="info-header">
+                    <div class="info-title">
+                      <svg class="info-title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                      <h4>Riwayat Scan</h4>
+                    </div>
+                    <button type="button" class="link-btn link-btn-header" id="btnLihatPresensi">Lihat semua &rarr;</button>
+                  </div>
                   <div class="table-wrapper table-scroll">
                     <table class="order-table order-table-compact">
                       <thead><tr><th>Waktu</th><th>Nama</th><th>Jenis</th></tr></thead>
                       <tbody id="riwayat"></tbody>
                     </table>
                   </div>
-                  <button type="button" class="link-btn" id="btnLihatPresensi">Lihat semua presensi &rarr;</button>
                 </div>
               </div>
             </div>

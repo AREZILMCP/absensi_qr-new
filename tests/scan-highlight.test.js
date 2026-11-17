@@ -7,6 +7,12 @@
    (tanpa antrean). Kupon makan otomatis terbit + ditebus satu scan.
    Kamera persegi 1:1 (aspect-ratio + video 100% + ResizeObserver);
    baris "Terakhir" di panel kanan hero; kunci data demo v2.
+   Redesign visual (17 Nov 2026, mockup referensi user): sidebar navy
+   + brand "Presensi", topbar judul+subjudul, kartu statistik berikon,
+   filter grafik Hari ini/Kemarin/7 hari terakhir, riwayat dengan
+   lingkaran inisial + badge jenis. Overlay hasil scan VERTIKAL
+   (ikon 140px di atas, nama maks 88px, tanpa foto, detail HANYA status
+   tanpa jam, catatan "Tertutup otomatis dalam 1 detik..." di bawah).
    Tombol nyala/mati kamera (#btnToggleCamera, manual-off dihormati
    auto-start dan kiosk; label mengikuti status via hook).
    Yang TIDAK diuji di sini (butuh browser + kamera asli): alur scan
@@ -629,6 +635,45 @@ async function main() {
     assert(seen[0].name === 'Reza Kurnia', 'nama hook harus Reza Kurnia');
   });
 
+  await test('overlay vertikal: ikon di atas, nama besar, tanpa foto, ada catatan bawah', async () => {
+    const ctx = freshScannerCtx({ karyawan: [emp('K0001', 'Reza Kurnia')] });
+    ctx.__setNow(8, 0);
+    const el = await startAndScan(ctx, 'K0001');
+    const html = el.innerHTML;
+    assertHas(html, 'scan-overlay-note');
+    assertHas(html, 'Tertutup otomatis dalam 1 detik...');
+    assert(!html.includes('scan-overlay-photo'), 'foto harus sudah dihapus dari overlay');
+    assert(!html.includes('scan-photo-initial'), 'inisial foto harus sudah dihapus');
+    assert(html.indexOf('scan-overlay-icon') < html.indexOf('scan-overlay-headline'), 'ikon harus di atas headline');
+    assert(html.indexOf('scan-overlay-headline') < html.indexOf('scan-overlay-name'), 'headline di atas nama');
+    assertHas(html, 'scan-overlay-meta');
+    assertHas(html, 'K0001');
+  });
+
+  await test('detail overlay tanpa jam: masuk "Tepat waktu", pulang tanpa lembur tanpa baris detail', async () => {
+    // Check-in 08:05 -> detail HANYA "Terlambat 5 menit" (tanpa jam)
+    const ctx = freshScannerCtx({ karyawan: [emp('K0001', 'Reza Kurnia')] });
+    const seen = [];
+    ctx.__Scanner.setResultHook((item) => seen.push(item));
+    ctx.__setNow(8, 5);
+    const el = await startAndScan(ctx, 'K0001');
+    assert(seen[0].detail === 'Terlambat 5 menit', 'detail harus "Terlambat 5 menit", dapat "' + seen[0].detail + '"');
+    assert(!el.innerHTML.includes('08:05'), 'detail tidak boleh menampilkan jam');
+    // Check-out 16:00 (0 lembur) -> detail kosong, baris detail disembunyikan
+    const ctx2 = freshScannerCtx({
+      karyawan: [emp('K0001', 'Reza Kurnia', {
+        absen: true, absenAt: '2026-11-16T08:05:00',
+        makan: true, makanAt: '2026-11-16T12:00:00', kuponKode: 'TR-2611-001', kuponStatus: 'ditebus',
+      })],
+    });
+    const seen2 = [];
+    ctx2.__Scanner.setResultHook((item) => seen2.push(item));
+    ctx2.__setNow(16, 0);
+    const el2 = await startAndScan(ctx2, 'K0001');
+    assert(seen2[0].detail === '', 'pulang tanpa lembur detail harus kosong, dapat "' + seen2[0].detail + '"');
+    assert(!el2.innerHTML.includes('scan-overlay-detail'), 'baris detail harus disembunyikan bila kosong');
+  });
+
   console.log('== gate layer dashboard (lampu memenuhi layar) ==');
 
   await test('gate: overlay ok -> gateLayer tampil gate-ok; hilang setelah timer 1 detik', async () => {
@@ -787,6 +832,155 @@ async function main() {
     assert(row && !row.classList.contains('riwayat-new'), 'tanpa tambahan tidak boleh sorot');
   });
 
+  await test('dashboard: filter grafik — Hari ini / Kemarin / 7 hari terakhir hitung ulang donut + legenda', async () => {
+    const doc = makeDocument();
+    const state = {
+      karyawan: [
+        emp('K0001', 'Reza Kurnia', { absen: true, absenAt: '2026-11-16T07:55:00', makan: true, makanAt: '2026-11-16T12:05:00', kuponKode: 'K-001', kuponStatus: 'terbit' }),
+        emp('K0002', 'Rio Andika', { absen: true, absenAt: '2026-11-16T08:10:00', makan: true, makanAt: '2026-11-15T12:10:00', kuponKode: 'K-002', kuponStatus: 'ditebus' }),
+        emp('K0003', 'Orta Dinanti'),
+      ],
+      presensi: [
+        { karyawanId: 'K0001', tanggal: '2026-11-15', masukAt: '2026-11-15T07:50:00', lembur: false },
+        { karyawanId: 'K0002', tanggal: '2026-11-15', masukAt: '2026-11-15T08:05:00', lembur: true },
+        { karyawanId: 'K0001', tanggal: '2026-11-10', masukAt: '2026-11-10T07:55:00', lembur: false },
+        { karyawanId: 'K0002', tanggal: '2026-11-11', masukAt: '2026-11-11T08:20:00', lembur: false },
+        { karyawanId: 'K0003', tanggal: '2026-11-12', masukAt: '2026-11-12T07:58:00', lembur: true },
+        { karyawanId: 'K0001', tanggal: '2026-11-16', masukAt: '2026-11-16T07:55:00', lembur: false },
+      ],
+      riwayat: [],
+      timers: [],
+    };
+    const sandbox = {
+      console,
+      document: doc,
+      setTimeout: (fn, ms) => { const id = state.timers.length + 1; state.timers.push({ id, fn, ms }); return id; },
+      clearTimeout: (id) => { state.timers = state.timers.filter((t) => t.id !== id); },
+      Utils: {
+        escapeHtml: (v) => String(v == null ? '' : v),
+        isToday: (v) => !!v && String(v).slice(0, 10) === '2026-11-16',
+        toLocalISODate: (v) => {
+          if (!v) return '';
+          if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+          const d = v instanceof Date ? v : new Date(v);
+          if (Number.isNaN(d.getTime())) return '';
+          const p = (n) => String(n).padStart(2, '0');
+          return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+        },
+        now: () => new Date(2026, 10, 16, 7, 56, 0),
+      },
+      Storage: {
+        getKaryawan: () => state.karyawan,
+        getReservasiManual: () => [],
+        getReservasiArchive: () => [],
+        getPresensi: () => state.presensi,
+        getRiwayat: () => state.riwayat,
+        todayLocalISO: () => '2026-11-16',
+        autoReleaseStaleOvertime: () => {},
+        cleanupStaleMeals: () => {},
+        cleanupStaleReservasiManual: () => {},
+      },
+    };
+    vm.createContext(sandbox);
+    vm.runInContext(read('js/dashboard.js'), sandbox, { filename: 'dashboard.js' });
+    vm.runInContext('globalThis.__Dashboard = Dashboard;', sandbox);
+    const D = sandbox.__Dashboard;
+    const txt = (id) => String(doc.getElementById(id).textContent);
+
+    // Default: Hari ini (dari absenAt karyawan)
+    D.render();
+    assert(txt('legendTepat') === '1' && txt('legendTelat') === '1' && txt('legendBelum') === '1', 'hari ini: tepat 1, telat 1, belum 1');
+    assert(txt('legendTepatPct') === '33%' && txt('legendBelumPct') === '33%', 'hari ini: persen 33%');
+    assert(txt('donutPercent') === '67%', 'hari ini: donut 67%');
+    assert(txt('donutLabel') === 'Kehadiran hari ini', 'label donut hari ini');
+    assert(txt('grafikTanggal') === '2026-11-16', 'tanggal hari ini');
+    assert(txt('lemburLabel') === 'Lembur hari ini:' && txt('kuponLabel') === 'Kupon terbit:', 'footer hari ini');
+    assert(txt('kuponTerbit') === '1' && txt('lemburHariIni') === '0', 'footer hari ini: terbit 1, lembur 0');
+
+    // Kemarin (dari catatan presensi 15 Nov)
+    D.setGrafikRange('yesterday');
+    assert(txt('legendTepat') === '1' && txt('legendTelat') === '1' && txt('legendBelum') === '1', 'kemarin: tepat 1, telat 1, belum 1');
+    assert(txt('donutLabel') === 'Kehadiran kemarin', 'label donut kemarin');
+    assert(txt('grafikTanggal') === '2026-11-15', 'tanggal kemarin');
+    assert(txt('lemburLabel') === 'Lembur kemarin:' && txt('kuponLabel') === 'Kupon ditebus:', 'footer kemarin');
+    assert(txt('kuponTerbit') === '1' && txt('lemburHariIni') === '1', 'footer kemarin: ditebus 1, lembur 1');
+
+    // 7 hari terakhir (10-16 Nov): tepat 4, telat 2, belum 15 dari 21
+    D.setGrafikRange('week');
+    assert(txt('legendTepat') === '4' && txt('legendTelat') === '2' && txt('legendBelum') === '15', '7 hari: tepat 4, telat 2, belum 15');
+    assert(txt('legendTepatPct') === '19%' && txt('legendTelatPct') === '10%' && txt('legendBelumPct') === '71%', '7 hari: persen 19/10/71');
+    assert(txt('donutPercent') === '29%', '7 hari: donut 29%');
+    assert(txt('donutLabel') === 'Kehadiran 7 hari terakhir', 'label donut 7 hari');
+    assert(txt('grafikTanggal') === '2026-11-10 – 2026-11-16', 'tanggal 7 hari');
+    assert(txt('lemburHariIni') === '2' && txt('kuponTerbit') === '1', 'footer 7 hari: lembur 2, ditebus 1');
+
+    // Nilai tak dikenal kembali ke Hari ini
+    D.setGrafikRange('bogus');
+    assert(txt('donutLabel') === 'Kehadiran hari ini', 'range tak dikenal harus kembali ke Hari ini');
+  });
+
+  await test('dashboard: riwayat — jam HH:MM:SS, lingkaran inisial, badge jenis', async () => {
+    const doc = makeDocument();
+    const state = {
+      karyawan: [emp('K0001', 'Reza Kurnia')],
+      riwayat: [
+        { nama: 'Muhammad Syechan Al Fariz', jenis: 'Absensi', waktu: '17/11/2026, 07.55.44' },
+        { nama: 'Reza Kurnia', jenis: 'Makan Siang', waktu: '17/11/2026, 12.05.10' },
+        { nama: 'Rio Andika', jenis: 'Ekstra Makan', waktu: '17/11/2026, 18.10.00' },
+        { nama: 'Orta Dinanti', jenis: 'Absensi Pulang', waktu: '17/11/2026, 16.05.00' },
+      ],
+      timers: [],
+    };
+    const sandbox = {
+      console,
+      document: doc,
+      setTimeout: (fn, ms) => { const id = state.timers.length + 1; state.timers.push({ id, fn, ms }); return id; },
+      clearTimeout: (id) => { state.timers = state.timers.filter((t) => t.id !== id); },
+      Utils: {
+        escapeHtml: (v) => String(v == null ? '' : v),
+        isToday: (v) => !!v && String(v).slice(0, 10) === '2026-11-16',
+        toLocalISODate: (v) => (v ? String(v).slice(0, 10) : ''),
+      },
+      Storage: {
+        getKaryawan: () => state.karyawan,
+        getReservasiManual: () => [],
+        getReservasiArchive: () => [],
+        getPresensi: () => [],
+        getRiwayat: () => state.riwayat,
+        todayLocalISO: () => '2026-11-16',
+        autoReleaseStaleOvertime: () => {},
+        cleanupStaleMeals: () => {},
+        cleanupStaleReservasiManual: () => {},
+      },
+    };
+    vm.createContext(sandbox);
+    vm.runInContext(read('js/dashboard.js'), sandbox, { filename: 'dashboard.js' });
+    vm.runInContext('globalThis.__Dashboard = Dashboard;', sandbox);
+    sandbox.__Dashboard.render();
+    const html = doc.getElementById('riwayat').innerHTML;
+    // Waktu hanya HH:MM:SS (tanggal lengkap hanya di title/hover)
+    assertHas(html, '>07:55:44<');
+    assertHas(html, '>12:05:10<');
+    assertHas(html, '>18:10:00<');
+    assertHas(html, '>16:05:00<');
+    // Inisial: kata pertama + kata kedua
+    assertHas(html, '>MS<');
+    assertHas(html, '>RK<');
+    assertHas(html, '>RA<');
+    assertHas(html, '>OD<');
+    assertHas(html, 'riwayat-initial');
+    assertHas(html, 'ic-clock');
+    // Badge jenis berwarna
+    assertHas(html, 'jenis-badge badge-green');
+    assertHas(html, 'Absensi Masuk');
+    assertHas(html, 'jenis-badge badge-blue');
+    assertHas(html, 'Makan Siang');
+    assertHas(html, 'jenis-badge badge-purple');
+    assertHas(html, 'Ekstra Makan');
+    assertHas(html, 'jenis-badge badge-gray');
+    assertHas(html, 'Absensi Pulang');
+  });
+
   console.log('== kiosk.js — Mode Kiosk-lite (kamera dulu, baru fullscreen) ==');
 
   await test('kiosk: toggle sembunyikan menu + fullscreen, tersimpan', async () => {
@@ -805,11 +999,11 @@ async function main() {
     assert(doc.body.classList.contains('kiosk-lite'), 'body harus punya class kiosk-lite');
     assert(localStorage.getItem('kiosk_lite') === '1', 'harus tersimpan');
     assert(doc.documentElement.requestFullscreenCalls === 1, 'harus minta fullscreen');
-    assert(btn.textContent === '⛶ Keluar Kiosk', 'label tombol harus berubah');
+    assert(btn.textContent === 'Keluar Kiosk', 'label tombol harus berubah');
     await K.toggle();
     assert(!doc.body.classList.contains('kiosk-lite'), 'toggle kedua harus keluar kiosk');
     assert(doc.exitFullscreenCalls === 1, 'harus keluar fullscreen');
-    assert(btn.textContent === '⛶ Mode Kiosk', 'label kembali');
+    assert(btn.textContent === 'Mode Kiosk', 'label kembali');
   });
 
   await test('kiosk: init terapkan status tersimpan tanpa fullscreen', async () => {
@@ -944,7 +1138,7 @@ async function main() {
     assertHas(html, 'id="gateLayer"');
     assertHas(html, 'id="btnToggleCamera"');
     assertHas(html, 'Nyalakan Kamera');
-    assertHas(html, 'css/style.css?v=overlayfull1');
+    assertHas(html, 'css/style.css?v=redesign1');
     assert(!html.includes('data-scan-start'), 'tidak boleh ada tombol Mulai Scan');
     assert(!html.includes('data-scan-stop'), 'tidak boleh ada tombol Stop');
     assert(!html.includes('btnOpenScanPage'), 'tidak boleh ada tombol Buka Halaman Scan');
@@ -953,6 +1147,17 @@ async function main() {
     assert(!html.includes('heroHint'), 'heroHint harus sudah dihapus');
     assertHas(html, 'id="scanLast"');
     assertHas(html, 'id="scanLastText"');
+    // Redesign: sidebar brand + kartu user, topbar judul+subjudul, filter grafik, badge Terakhir
+    assertHas(html, 'id="topbarSubtitle"');
+    assertHas(html, 'Monitoring kehadiran dan aktivitas presensi karyawan');
+    assertHas(html, 'id="userRoleLabel"');
+    assertHas(html, 'Sistem Kehadiran Karyawan');
+    assertHas(html, 'id="grafikFilter"');
+    assertHas(html, '7 hari terakhir');
+    assertHas(html, 'id="scanLastBadge"');
+    assertHas(html, 'id="donutLabel"');
+    assertHas(html, 'hero-cam-corners');
+    assertHas(html, 'id="legendTepatPct"');
   });
 
   await test('scan.html + js/scan-page.js sudah dihapus', async () => {
@@ -995,54 +1200,58 @@ async function main() {
     assertHas(css, 'align-items: flex-start;\n  justify-content: space-between;');
     assertHas(css, 'max-width: 900px;');
     assert(!css.includes('max-width: 560px;'), 'max-width 560px terpusat harus sudah dihapus');
-    // Tombol kamera lebar auto (bukan full-width), kotak Terakhir lebih sempit
-    assertHas(css, '.hero-side #btnToggleCamera {\n  width: auto;\n  min-width: 220px;\n}');
+    // Tombol kamera pindah ke dalam kotak kamera (hint): lebar auto, putih
+    assertHas(css, '.hero-cam-hint #btnToggleCamera {\n  width: auto;\n  min-width: 200px;');
+    assert(!css.includes('.hero-side #btnToggleCamera'), 'tombol kamera tidak lagi di panel kanan');
     assertHas(css, '.hero-side .scan-last {\n  max-width: 720px;\n}');
     // Overlay FULLSCREEN (bukan hanya pita hero): teks hasil scan
     // terpusat di tengah viewport, bukan di atas layar saja
     assertHas(css, '.scan-overlay {\n  /* FULLSCREEN: hasil scan terpusat di tengah layar (bukan hanya pita\n     hero) — gate layer (fixed) memenuhi layar, overlay pun harus\n     begitu, kalau tidak 2/3 bawah layar hanya warna kosong. */\n  position: fixed;\n  inset: 0;');
     assertHas(css, 'min-height: 0;\n  border-radius: 0;\n}');
     // Overlay terpusat sebagai grup: info tidak flex:1, lebar maks dibatasi
-    assertHas(css, '.scan-overlay-info { flex: 0 1 auto; max-width: min(880px, 72%); min-width: 0; text-align: center; }');
+    assertHas(css, '.scan-overlay-info { flex: 0 1 auto; max-width: min(1200px, 92%); min-width: 0; text-align: center; }');
     // Ukuran teks besar (naik lagi karena overlay kini fullscreen)
-    assertHas(css, '.scan-overlay-headline {\n  font-size: clamp(1.5rem, 3vw, 2.4rem);');
-    assertHas(css, '.scan-overlay-name {\n  font-size: clamp(2.5rem, 5vw, 4.5rem);');
+    assertHas(css, '.scan-overlay-headline {\n  font-size: clamp(1.75rem, 3.5vw, 2.6rem);');
+    assertHas(css, '.scan-overlay-name {\n  font-size: clamp(2.75rem, 6vw, 5.5rem);');
     // Gate di bawah overlay (4500), overlay fullscreen di atas gate, modal tetap paling atas
     assertHas(css, 'z-index: 4500;');
     assertHas(css, 'z-index: 4600;');
     assertHas(css, 'z-index: 5000;');
   });
 
-  await test('css: overlay hasil scan fullscreen, besar + terpusat (headline/nama/kode kupon, ikon & foto 88px)', async () => {
+  await test('css: overlay hasil scan fullscreen VERTIKAL (ikon 140px di atas, nama maks 88px, tanpa foto)', async () => {
     const css = read('css/style.css');
     // Fullscreen: overlay menutupi viewport (bukan hanya hero), konten terpusat di tengah layar
     assertHas(css, '.scan-overlay {\n  /* FULLSCREEN: hasil scan terpusat di tengah layar (bukan hanya pita\n     hero) — gate layer (fixed) memenuhi layar, overlay pun harus\n     begitu, kalau tidak 2/3 bawah layar hanya warna kosong. */\n  position: fixed;\n  inset: 0;');
     assertHas(css, 'min-height: 0;\n  border-radius: 0;\n}');
-    // Terpusat: baris overlay justify-content center, blok info text-align center, kupon terpusat
+    // VERTIKAL terpusat: ikon di atas, headline, nama, meta, detail, kupon — kolom, bukan baris
+    assertHas(css, 'flex-direction: column;\n  align-items: center;\n  justify-content: center;\n  gap: 18px;');
     assertHas(css, 'align-items: center;\n  justify-content: center;\n  gap: 18px;');
-    assertHas(css, '.scan-overlay-info { flex: 0 1 auto; max-width: min(880px, 72%); min-width: 0; text-align: center; }');
-    assertHas(css, 'align-items: baseline; justify-content: center; gap: 10px;');
+    assertHas(css, '.scan-overlay-info { flex: 0 1 auto; max-width: min(1200px, 92%); min-width: 0; text-align: center; }');
+    assertHas(css, '.scan-overlay-kupon { margin-top: 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; }');
     // Lebih besar lagi (overlay kini fullscreen, bukan pita hero ~339px)
-    assertHas(css, '.scan-overlay-headline {\n  font-size: clamp(1.5rem, 3vw, 2.4rem);');
-    assertHas(css, '.scan-overlay-name {\n  font-size: clamp(2.5rem, 5vw, 4.5rem);');
-    assertHas(css, '.scan-overlay-meta { font-size: 1rem; opacity: 0.85; }');
+    assertHas(css, '.scan-overlay-headline {\n  font-size: clamp(1.75rem, 3.5vw, 2.6rem);');
+    assertHas(css, '.scan-overlay-name {\n  font-size: clamp(2.75rem, 6vw, 5.5rem);');
+    assertHas(css, '.scan-overlay-meta { font-size: 1.1rem; opacity: 0.9; }');
     assertHas(css, '.scan-overlay-detail { font-size: clamp(1.05rem, 1.6vw, 1.5rem); margin-top: 2px; }');
     assertHas(css, '.scan-overlay-kupon-lbl { font-size: 0.9rem;');
     assertHas(css, '.scan-overlay-kupon-kode { font-size: clamp(1.8rem, 3.4vw, 2.8rem);');
-    // Ikon & foto 88px (bukan 72px lagi)
-    assertHas(css, 'width: 88px;\n  height: 88px;\n  border-radius: 50%;\n  background: rgba(255, 255, 255, 0.18);');
-    assertHas(css, 'font-size: 3rem;\n  font-weight: 700;\n  line-height: 1;');
-    assertHas(css, 'width: 88px;\n  height: 88px;\n  border-radius: 50%;\n  overflow: hidden;');
-    assertHas(css, '.scan-overlay-photo .scan-photo-initial { font-size: 2.2rem; color: #fff; }');
-    assert(!css.includes('width: 72px;'), 'ikon/foto overlay tidak boleh lagi 72px');
+    // Ikon besar 140px di atas; FOTO DIHAPUS dari overlay
+    assertHas(css, 'width: 140px;\n  height: 140px;\n  border-radius: 50%;\n  background: rgba(255, 255, 255, 0.18);');
+    assertHas(css, 'font-size: 3.5rem;\n  font-weight: 700;\n  line-height: 1;');
+    assert(!css.includes('.scan-overlay-photo'), 'foto overlay harus sudah dihapus dari CSS');
+    assert(!css.includes('.scan-overlay-photo .scan-photo-initial'), 'inisial foto overlay harus sudah dihapus');
+    assert(!css.includes('width: 72px;'), 'ikon overlay tidak boleh lagi 72px');
+    // Catatan bawah: tertutup otomatis dalam 1 detik, absolute bottom center
+    assertHas(css, '.scan-overlay-note { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);');
     // Nama tetap nowrap + ellipsis supaya nama panjang tidak merusak layout
     assertHas(css, 'white-space: nowrap;');
     // Warna latar per tipe tidak berubah
     assertHas(css, '.scan-overlay-ok   { background: #047857; }');
     assertHas(css, '.scan-overlay-warn { background: #b45309; }');
     assertHas(css, '.scan-overlay-err  { background: #b91c1c; }');
-    // Layar kecil: foto tetap hidden, ikon 64px, teks turun proporsional
-    assertHas(css, '.scan-overlay-icon { width: 64px; height: 64px; font-size: 2.2rem; }');
+    // Layar kecil: ikon 96px, teks turun proporsional
+    assertHas(css, '.scan-overlay-icon { width: 96px; height: 96px; font-size: 2.6rem; }');
     assertHas(css, '.scan-overlay-headline { font-size: clamp(1.2rem, 4vw, 1.6rem); }');
     assertHas(css, '.scan-overlay-name { font-size: clamp(1.8rem, 6vw, 2.2rem); }');
     assertHas(css, '.scan-overlay-kupon-kode { font-size: clamp(1.4rem, 5vw, 1.8rem); }');
@@ -1087,7 +1296,9 @@ async function main() {
     assertHas(src, 'if (cameraManualOff) return;');
     assertHas(src, 'syncCameraToggleLabel');
     assertHas(src, 'setCameraStatusHook');
-    assertHas(src, "btn.textContent = on ? 'Matikan Kamera' : 'Nyalakan Kamera'");
+    assertHas(src, "const text = on ? 'Matikan Kamera' : 'Nyalakan Kamera';");
+    assertHas(src, "btn.querySelector('.btn-label')");
+    assertHas(src, 'label.textContent = text;');
     assertHas(src, "document.body.dataset.cameraManualOff = '1'");
     // Nyalakan memakai jalur auto-start yang sama (deferred + fitVideo).
     assertHas(src, 'scheduleDashboardScanStart();');
