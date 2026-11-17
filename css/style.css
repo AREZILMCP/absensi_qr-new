@@ -2750,14 +2750,62 @@ body.kiosk-lite .btn-hamburger-topbar { display: none; }
     padding: 12px 14px;
   }
 
-  /* --- Topbar --- */
+  /* --- Topbar: dua baris, tidak meluap (bug mobile 17 Nov 2026) ---
+     Di ~390px, isi topbar desktop (judul + jam + suara + kiosk +
+     badge demo + Keluar) total ~450px sehingga meluap: jam menumpuk
+     di kiri, tombol Keluar terpotong di kanan, judul tidak terlihat.
+     Perbaikan: topbar membungkus jadi dua baris — baris 1: hamburger
+     + home + judul (subjudul disembunyikan); baris 2: jam + kontrol
+     (kiosk & Keluar icon-only, badge demo lebih kecil). */
   .topbar {
-    padding: 10px 14px;
-    flex-wrap: nowrap;
+    padding: 10px 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .topbar-left {
+    flex: 1 1 100%;
+    gap: 8px;
   }
 
   .topbar-title {
     font-size: 1rem;
+  }
+
+  .topbar-subtitle {
+    display: none;
+  }
+
+  .topbar-right {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .topbar-clock-time {
+    font-size: 1rem;
+  }
+
+  .btn-topbar-icon {
+    padding: 6px 8px;
+  }
+
+  #btnKioskToggle .btn-label {
+    display: none;
+  }
+
+  #btnLogout span {
+    display: none;
+  }
+
+  .btn-logout {
+    padding: 6px 8px;
+  }
+
+  .demo-badge {
+    font-size: 0.65rem;
+    padding: 4px 8px;
   }
 
   .search-box {
@@ -2767,7 +2815,9 @@ body.kiosk-lite .btn-hamburger-topbar { display: none; }
 
   /* --- Content & dashboard --- */
   .content {
-    padding: 16px;
+    /* Padding bawah ekstra supaya kartu terakhir bisa di-scroll
+       di atas FAB "Pengaturan Demo" (fixed kanan bawah) di mobile. */
+    padding: 16px 16px 96px;
   }
 
   .stats-cards {
@@ -2789,6 +2839,12 @@ body.kiosk-lite .btn-hamburger-topbar { display: none; }
 
   .hero-scan {
     grid-template-columns: 1fr;
+  }
+
+  /* Kotak "Terakhir" boleh membungkus supaya badge status tidak
+     terpotong bila teks hasil scan panjang di layar sempit. */
+  .scan-last {
+    flex-wrap: wrap;
   }
 
   .hero-cam {
@@ -2824,6 +2880,10 @@ body.kiosk-lite .btn-hamburger-topbar { display: none; }
   }
 
   .topbar-title {
+    font-size: 0.95rem;
+  }
+
+  .topbar-clock-time {
     font-size: 0.95rem;
   }
 

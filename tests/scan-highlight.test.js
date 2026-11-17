@@ -15,6 +15,10 @@
    tanpa jam, catatan "Tertutup otomatis dalam 1 detik..." di bawah).
    Tombol nyala/mati kamera (#btnToggleCamera, manual-off dihormati
    auto-start dan kiosk; label mengikuti status via hook).
+   Tampilan mobile (17 Nov 2026): topbar dua baris di <=768px (judul
+   tetap terlihat, subjudul + tanggal disembunyikan, kiosk & Keluar
+   icon-only) supaya tidak meluap di ~390px; drawer sidebar sudah ada
+   (hamburger topbar + backdrop + tombol tutup + Esc).
    Yang TIDAK diuji di sini (butuh browser + kamera asli): alur scan
    end-to-end lewat kamera sungguhan.
    Jalankan: node tests/scan-highlight.test.js */
@@ -1151,7 +1155,7 @@ async function main() {
     assertHas(html, 'id="gateLayer"');
     assertHas(html, 'id="btnToggleCamera"');
     assertHas(html, 'Nyalakan Kamera');
-    assertHas(html, 'css/style.css?v=redesign1');
+    assertHas(html, 'css/style.css?v=mobile1');
     assert(!html.includes('data-scan-start'), 'tidak boleh ada tombol Mulai Scan');
     assert(!html.includes('data-scan-stop'), 'tidak boleh ada tombol Stop');
     assert(!html.includes('btnOpenScanPage'), 'tidak boleh ada tombol Buka Halaman Scan');
@@ -1268,6 +1272,52 @@ async function main() {
     assertHas(css, '.scan-overlay-headline { font-size: clamp(1.2rem, 4vw, 1.6rem); }');
     assertHas(css, '.scan-overlay-name { font-size: clamp(1.8rem, 6vw, 2.2rem); }');
     assertHas(css, '.scan-overlay-kupon-kode { font-size: clamp(1.4rem, 5vw, 1.8rem); }');
+  });
+
+  await test('css: tampilan mobile <=768px — topbar dua baris, tombol icon-only, tanpa luapan', async () => {
+    const css = read('css/style.css');
+    const html = read('index.html');
+    // Topbar desktop (~450px) meluap di ~390px: jam menumpuk di kiri,
+    // Keluar terpotong di kanan, judul tidak terlihat. Di <=768px topbar
+    // membungkus jadi DUA baris: baris 1 hamburger + home + judul,
+    // baris 2 jam + kontrol — bukan lagi flex-wrap: nowrap.
+    assert(!css.includes('flex-wrap: nowrap;'), 'topbar mobile tidak boleh lagi flex-wrap: nowrap');
+    assertHas(css, '.topbar {\n    padding: 10px 12px;\n    flex-wrap: wrap;');
+    assertHas(css, '.topbar-left {\n    flex: 1 1 100%;');
+    assertHas(css, '.topbar-right {\n    flex: 1 1 100%;\n    justify-content: flex-start;\n    flex-wrap: wrap;');
+    // Baris 1: judul tetap terlihat (lebih kecil), subjudul disembunyikan
+    assertHas(css, '.topbar-title {\n    font-size: 1rem;');
+    assertHas(css, '.topbar-subtitle {\n    display: none;');
+    // Baris 2: tanggal disembunyikan (jam HH:MM:SS saja, lebih kecil)
+    assertHas(css, '.topbar-clock-date { display: none; }');
+    assertHas(css, '.topbar-clock-time { font-size: 1.05rem; }');
+    // Baris 2: Mode Kiosk & Keluar jadi icon-only (label disembunyikan),
+    // tombol tetap punya aria-label supaya tetap terbaca screen reader
+    assertHas(css, '#btnKioskToggle .btn-label {\n    display: none;');
+    assertHas(css, '#btnLogout span {\n    display: none;');
+    assertHas(html, 'aria-label="Mode Kiosk"');
+    assertHas(html, 'aria-label="Keluar"');
+    assertHas(css, '.demo-badge {\n    font-size: 0.65rem;\n    padding: 4px 8px;');
+    // Hero menumpuk 1 kolom; kotak "Terakhir" boleh membungkus supaya
+    // badge status tidak terpotong bila teks hasil scan panjang
+    assertHas(css, '.hero-scan {\n    grid-template-columns: 1fr;');
+    assertHas(css, '.scan-last {\n    flex-wrap: wrap;');
+    // Statistik 2 kolom (<=1024px) lalu 1 kolom (<=480px); grafik +
+    // riwayat menumpuk penuh lebar; tabel riwayat scroll DI DALAM kartu
+    assertHas(css, '.stats-cards {\n    grid-template-columns: repeat(2, 1fr);');
+    assertHas(css, '.stats-cards {\n    grid-template-columns: 1fr;');
+    assertHas(css, '.info-row {\n    grid-template-columns: 1fr;');
+    assertHas(css, '.table-wrapper {\n  overflow-x: auto;');
+    // Drawer sidebar sudah ada: hamburger topbar + backdrop + tombol
+    // tutup di sidebar (JS main.js default tertutup di mobile)
+    assertHas(html, 'id="btnSidebarToggle"');
+    assertHas(html, 'id="btnSidebarClose"');
+    assertHas(html, 'id="sidebarBackdrop"');
+    assertHas(css, '.app:not(.sidebar-collapsed) .btn-hamburger-topbar');
+    // Padding bawah konten supaya kartu terakhir bisa di-scroll di atas
+    // FAB "Pengaturan Demo" (fixed kanan bawah) di mobile
+    assertHas(css, 'padding: 16px 16px 96px;');
+    assertHas(html, 'css/style.css?v=mobile1');
   });
 
   await test('scanner.js: MODE_TEXT hanya title+desc; desc presensi satu baris aturan lengkap', async () => {
